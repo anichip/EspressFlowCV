@@ -68,6 +68,8 @@ for folder_name in frame_folders_root:
 
         all_hue_values = [] # stores hue (color) so that we can later take the average
         all_brightness_values = [] # stores grayscale brightness
+        frame_brightness_series = [] #for flow_variance: capture grayscale mean brightness per frame
+        stream_widths = [] #for stream_width
 
         for frame_name in sorted(os.listdir(video_folder_path)):   # loop over all images
             frame_path = os.path.join(video_folder_path, frame_name)
@@ -87,19 +89,66 @@ for folder_name in frame_folders_root:
             gray = cv2.cvtColor(frame,cv2.COLOR_BGR2GRAY)
             all_brightness_values.append(np.mean(gray))
 
+            #now using gray is part of how we get the flow_variance. 
+            # btw, np.mean(gray) is essentially the avg brightness of the frame
+            frame_brightness_series.append(np.mean(gray))
+
+            ########## This section below is for getting the stream_width feature ####.
+
+            # 5a. Apply Gaussian Blur to the grayscale to reduce noise , takes image, odd kernel width,height, stdev of XY directions
+            blurred = cv2.GaussianBlur(gray,(5,5),0)
+
+            #5b. Use binary thresholding to isolate the stream from the background
+            # using THRESH_BINARY_INV because the stream of espresso is darker against light backgrounds
+            #Any pixel darker than 50 becomes white (255), and anything brighter becomes black (0).
+            ret, thresh = cv2.threshold(blurred,50,255,cv2.THRESH_BINARY_INV)
+
+            #The stream --> dark brown espresso --> dark gray --> white
+            #the background --> BLACK
+
+            #5c. Find contours in threshold so that we can properly isolate
+            #the RETR_EXTERNAL just gets outermost contours. 
+            contours, hierarchy = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+            #5d. Filter small contours that don't matter. It's the stream that's prominent
+
+            valid_widths = []
+            for cnt in contours:
+                #draw the smallest box around each contour (white blob)
+                #width w is our indicator for how wide the stream is 
+                x,y,w,h = cv2.boundingRect(cnt)
+                if h>30 and w>5 : #MAY NEED TO CHANGE this bound box approach
+                    #stream is tall and thin, so let's get a height of 30 and width of 5
+                    valid_widths.append(w)
+            
+            #5e. what we keep is the widest valid contour
+            if valid_widths:
+                stream_widths.append(max(valid_widths))
+
+
         #NOW THE FRAME LOOP HAS ENDED AND WE ARE ABOUT TO MOVE TO THE NEXT vid_{number}_{category} FOLDER
         #for that folder though, let's calculate the average hue and brightness for real. 
         # This is now for That VIDEO SPECIFICALLY
-        avg_hue = np.mean(all_hue_values)
-        avg_brightness = np.mean(all_brightness_values)
 
+        #(1) avg_hue
+        avg_hue = np.mean(all_hue_values) if all_hue_values else np.nan
+        #(2) avg_brightness
+        avg_brightness = np.mean(all_brightness_values) if all_brightness_values else np.nan
+
+        #(3) pull_duration
         match = df_pull[df_pull["Video_Name"] == video_folder]
         if not match.empty:
             pull_duration = match.iloc[0]["Pull_Duration(s)"]
         else:
-            print(f"⚠️ No pull duration found for {video_folder}, setting to None")
-            pull_duration = None
+            print(f"⚠️ No pull duration found for {video_folder}, setting to Nan")
+            pull_duration = np.nan
 
+        #(4) new feature: flow_variance ; variance of brightness over time
+        flow_variance = np.var(frame_brightness_series) if frame_brightness_series else np.nan
+
+        #(5) new feature: avg_stream_width
+        avg_stream_width = np.mean(stream_widths) if stream_widths else np.nan
+ 
         #now store the data we just calculated. 
         #feature_data is a list, but every entry will be a row
         # that row has a name (vid_{number}_{category} FOLDER) , a category , avg_hue, and avg_brightness
@@ -108,7 +157,9 @@ for folder_name in frame_folders_root:
             folder_name.replace("frames_", "").replace("_pulls", ""),  #ex:  'perfect'
             round(avg_hue,2),
             round(avg_brightness,2),
-            pull_duration
+            pull_duration,
+            flow_variance,
+            avg_stream_width
         ])
 
 # Append new data to CSV
@@ -116,10 +167,11 @@ write_header = not os.path.exists(csv_output_path)
 with open(csv_output_path, 'a', newline='') as csvfile:
     writer = csv.writer(csvfile)
     if write_header:
-        writer.writerow(["Video_Name", "Category", "Avg_Hue", "Avg_Brightness","Pull_Duration"])
+        writer.writerow(["Video_Name", "Category", "Avg_Hue", "Avg_Brightness","Pull_Duration","Flow_Variance","Avg_Stream_Width"])
     writer.writerows(feature_data)
 
 print(f"✅ Feature extraction complete. {len(feature_data)} new rows added.")
 
 
-# Still need to do flow_variance and stream_width, but this is good progress for today
+
+
