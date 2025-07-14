@@ -138,9 +138,15 @@ for folder_name in frame_folders_root:
         avg_brightness = np.mean(all_brightness_values) if all_brightness_values else np.nan
 
         #(3) pull_duration
+
+        #I caught that error so nicely. But we can definitely make it future-proof and neater
+        #this data frame is just here. Modify the name of video to not have the file type at the end, and all lowercase 
+        df_pull["Video_Name"] = df_pull["Video_Name"].str.lower().str.replace(r"\.(mov|mp4|avi)$", "", regex=True)
+        #now this match part is cleaner
         match = df_pull[df_pull["Video_Name"] == video_folder]
         if not match.empty:
             pull_duration = match.iloc[0]["Pull_Duration(s)"]
+            print(f" Added {video_folder}'s Pull Duration, good stuff")
         else:
             print(f"⚠️ No pull duration found for {video_folder}, setting to Nan")
             pull_duration = np.nan
