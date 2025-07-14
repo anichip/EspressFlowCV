@@ -14,9 +14,10 @@ import pandas as pd
 project_root = "/Users/r3alistic/Programming/CoffeeCV"
 csv_output_path = os.path.join(project_root, "features.csv")
 
+#removed frames_mid_pulls
+#changed frames_perfect_pulls to frames_good_pulls
 frame_folders_root = [
-    "frames_perfect_pulls",
-    "frames_mid_pulls",
+    "frames_good_pulls",
     "frames_under_pulls",
     "frames_over_pulls"
 ]
@@ -104,6 +105,7 @@ for folder_name in frame_folders_root:
             ret, thresh = cv2.threshold(blurred,50,255,cv2.THRESH_BINARY_INV)
 
             #The stream --> dark brown espresso --> dark gray --> white
+            #just keep picturing the black surrounding all darkened with beautiful white streams
             #the background --> BLACK
 
             #5c. Find contours in threshold so that we can properly isolate
@@ -171,6 +173,8 @@ with open(csv_output_path, 'a', newline='') as csvfile:
     writer.writerows(feature_data)
 
 print(f"✅ Feature extraction complete. {len(feature_data)} new rows added.")
+
+#What we doing tomorrow : test running this file. I don't know what to test or how to test but we shall test it
 
 
 

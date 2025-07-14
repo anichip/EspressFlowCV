@@ -6,11 +6,12 @@ def run_extraction(category):
 
     #User settings 
     #choose the folder where the extracted frames should go 
-    #Let's target 13 seconds of footage at 30 fps , so 390 frames total 
+
+    #Now switched to 11 seconds at 30 fps, so each vid will standardize to 330 frames
 
     input_folder = f"/Users/r3alistic/Programming/CoffeeCV/data_{category}_pulls"
     output_root = f"/Users/r3alistic/Programming/CoffeeCV/frames_{category}_pulls"
-    clip_duration_sec = 13
+    clip_duration_sec = 11
     target_fps = 30
     pull_data = []
 
@@ -77,7 +78,7 @@ def run_extraction(category):
 
         print(f"📹 Processing {video_name} | FPS: {fps} | Total Frames: {total_frames}")
 
-        #How many frames to save? max 13 seconds, so max 390 frames
+        #How many frames to save? max 11 seconds, so max 330 frames
         #so this solves my dilemma of what to do if the video was too short: 
         # the choice is whichever has smaller amount of frames total: the threshold or the video
         max_frames = int(min(clip_duration_sec*target_fps,total_frames))
@@ -93,7 +94,7 @@ def run_extraction(category):
         os.makedirs(output_dir,exist_ok=True)
 
 
-        ########### part 2: saving those crucial first 13 seconds 
+        ########### part 2: saving those crucial first 11 seconds 
         frame_count = 0 
         saved_frame_count = 0
         last_valid_frame=None
@@ -161,10 +162,12 @@ def run_extraction(category):
 
 
 ############### MAIN 
-categories = ["perfect","mid","over","under"]
+
+#removed perfect and mid and added "good"
+categories = ["good","over","under"]
 for cat in categories:
     run_extraction(cat)
     print(f"✅ Gabruuuuuuu Completed {cat} category extraction\n")
 
-    
+
 
