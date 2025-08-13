@@ -11,8 +11,8 @@ def run_extraction(category):
 
     input_folder = f"/Users/r3alistic/Programming/CoffeeCV/data_{category}_pulls"
     output_root = f"/Users/r3alistic/Programming/CoffeeCV/frames_{category}_pulls"
-    clip_duration_sec = 11
-    target_fps = 30
+    clip_duration_sec = 7
+    target_fps = 60
     pull_data = []
 
     #create output directory for the frames

@@ -84,7 +84,7 @@ for folder_name in frame_folders_root:
             # Convert from the default BGR to HSV for color analysis
             hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
             hue = hsv[:, :, 0]  # Extract hue channel (0-180)
-            all_hue_values.append(np.mean(hue)) #across all pixels in this one frame, take the mean and add it 
+            all_hue_values.append(np.mean(hue)) #across all pixels in this one frame, take the mean and append it 
 
             #conver to Grayscale to analzye brightness 
             gray = cv2.cvtColor(frame,cv2.COLOR_BGR2GRAY)

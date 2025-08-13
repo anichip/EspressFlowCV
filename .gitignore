@@ -1,0 +1,19 @@
+*.mov
+*.mp4
+frames_*/
+data_*/
+features.csv
+pull_times.csv
+__pycache__/
+*.pyc
+.vscode/
+test_cv.py
+Sample_CV.webp
+openCV_Tutorial.py
+coffeecv.yml
+CLAUDE.md
+
+# Ignore all debug images except specific ones
+debug_*.jpg
+!debug_early_frame_070_original.jpg
+!debug_middle_frame_210_roi.jpg
