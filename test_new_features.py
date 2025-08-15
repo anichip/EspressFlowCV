@@ -114,8 +114,8 @@ def test_single_frame_extraction():
     project_root = "/Users/r3alistic/Programming/CoffeeCV"
     test_folders = ["frames_good_pulls", "frames_under_pulls", "frames_over_pulls"]
     
-    # Look specifically for vid_42_good
-    target_video = "vid_42_good"
+    # Look specifically for the target video. changes from time to time.
+    target_video = "vid_75_good"
     test_video_path = None
     
     for folder_name in test_folders:
@@ -187,9 +187,11 @@ def test_feature_extraction():
     # Create some fake timeline data to test with
     fake_hue_timeline = [15, 18, 20, 22, 25, 27, 30, 32, 35, 38]  # Getting darker over time
     fake_width_timeline = [12, 15, 18, 16, 14, 15, 17, 16, 14, 12]  # Some variation
+    fake_brightness_timeline = [125, 123, 120, 118, 115, 112, 110, 108, 105, 102]  # Getting darker (lower brightness)
     
     print(f"🎭 Testing with fake hue timeline: {fake_hue_timeline}")
     print(f"🌊 Testing with fake width timeline: {fake_width_timeline}")
+    print(f"💡 Testing with fake brightness timeline: {fake_brightness_timeline}")
     
     # Test Color Journey
     try:
@@ -209,6 +211,23 @@ def test_feature_extraction():
             print(f"   {key}: {value}")
     except Exception as e:
         print(f"❌ Flow Rhythm failed: {e}")
+        return False
+    
+    # Test Brightness Momentum (NEW!)
+    try:
+        brightness_features = extract_brightness_momentum_features(fake_brightness_timeline)
+        print(f"✅ Brightness Momentum features:")
+        for key, value in brightness_features.items():
+            print(f"   {key}: {value}")
+        
+        # Add interpretation of results
+        print("📊 Interpretation:")
+        print(f"   momentum {brightness_features['brightness_momentum']:.3f} = average change per frame")
+        print(f"   acceleration {brightness_features['brightness_acceleration']:.4f} = smoothness of changes")
+        print(f"   trend {brightness_features['brightness_trend']:.2f} = overall direction (negative = getting darker)")
+        
+    except Exception as e:
+        print(f"❌ Brightness Momentum failed: {e}")
         return False
         
     return True
@@ -256,9 +275,11 @@ def test_full_video_processing():
                 # Test feature extraction on real data
                 color_features = extract_color_journey_features(hue_timeline)
                 flow_features = extract_flow_rhythm_features(width_timeline)
+                brightness_features = extract_brightness_momentum_features(brightness_timeline)
                 
                 print(f"🎨 Real Color Journey features: {color_features}")
                 print(f"🌊 Real Flow Rhythm features: {flow_features}")
+                print(f"💡 Real Brightness Momentum features: {brightness_features}")
                 
                 return True
     

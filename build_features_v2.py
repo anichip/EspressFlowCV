@@ -34,7 +34,7 @@ def extract_stream_info_from_frame(frame):
     Returns: (hue_mean, brightness_mean, stream_width)
     
     NEW APPROACH - Much smarter stream detection:
-    1. ROI: Only look in center-bottom area (where espresso actually flows)
+    1. ROI: Only look in center-mid-top area (where espresso actually flows)
     2. Color filtering: Target brown/amber colors, not just "dark stuff" 
     3. Shape filtering: Streams are tall & thin, not random blobs
     4. Position consistency: Stream should be vertically oriented in center
@@ -173,7 +173,7 @@ def extract_flow_rhythm_features(width_timeline):
     # Think of it as "How consistent is this person's pulse?"
     # Low variance = steady pulse, High variance = irregular heartbeat
     flow_variance = np.var(width_timeline)
-    flow_steadiness = 1.0 / (1.0 + flow_variance)  # Higher = more steady
+    flow_steadiness = 1.0 / (1.0 + flow_variance)  # Higher = more steady because inverted.
     
     # Feature 2b: Flow Amplitude (difference between strongest and weakest flow)
     # Like measuring blood pressure: systolic - diastolic
@@ -195,28 +195,163 @@ def extract_flow_rhythm_features(width_timeline):
         'flow_trend': round(flow_trend, 2)
     }
 
-print("✅ Feature 2 (Flow Rhythm) implemented!")
+def extract_brightness_momentum_features(brightness_timeline):
+    """
+    FEATURE 3: Brightness Momentum - How fast does brightness change over time?
+    
+    INPUT: brightness_timeline 
+    - What it is: Array of brightness values (one per frame) from extract_stream_info_from_frame()
+    - Example: [120.5, 118.2, 115.8, 112.1, ...] for 420 frames
+    - Status: ❌ NOT YET CREATED - we need to build this timeline in main processing loop
+    - How to create: For each frame, take brightness_mean from extract_stream_info_from_frame()
+    
+    Real-world analogy: Like measuring how fast a car accelerates/decelerates
+    - Sports car: smooth acceleration → steady speed → gentle braking
+    - Broken car: jerky acceleration → sudden stops → erratic speed changes
+    
+    Good espresso: gradual brightness changes (smooth extraction)
+    Under-extracted: brightness drops too slowly (weak extraction)
+    Over-extracted: brightness drops too fast (harsh extraction)
+    
+    Returns 3 features about brightness momentum:
+    """
+    if not brightness_timeline or len(brightness_timeline) < 10:
+        return {'brightness_momentum': 0, 'brightness_acceleration': 0, 'brightness_trend': 0}
+    
+    phases = divide_frames_into_phases(len(brightness_timeline))
+    
+    # Feature 3a: Brightness Momentum (overall "speed" of brightness change)
+    # Like measuring the average speed of a car over a trip
+    # Calculate frame-to-frame brightness changes (derivatives)
+    brightness_changes = []
+    for i in range(1, len(brightness_timeline)):
+        change = abs(brightness_timeline[i] - brightness_timeline[i-1])
+        brightness_changes.append(change)
+    
+    brightness_momentum = np.mean(brightness_changes) if brightness_changes else 0
+    
+    # Feature 3b: Brightness Acceleration (is the rate of change speeding up or slowing down?)
+    # Like measuring if a car is accelerating or decelerating
+    # Calculate second derivative (change of change)
+    accelerations = []
+    for i in range(2, len(brightness_timeline)):
+        # Compare consecutive changes to see if rate is increasing/decreasing
+        change1 = brightness_timeline[i-1] - brightness_timeline[i-2]
+        change2 = brightness_timeline[i] - brightness_timeline[i-1]
+        acceleration = abs(change2 - change1)
+        accelerations.append(acceleration)
+    
+    brightness_acceleration = np.mean(accelerations) if accelerations else 0
+    
+    # Feature 3c: Brightness Trend (overall direction: getting brighter or darker?)
+    # Like asking "Did you end up going uphill or downhill overall?"
+    # Positive = getting brighter, Negative = getting darker
+    phase1_brightness = np.mean(brightness_timeline[phases['phase_1'][0]:phases['phase_1'][1]])
+    phase3_brightness = np.mean(brightness_timeline[phases['phase_3'][0]:phases['phase_3'][1]])
+    brightness_trend = phase3_brightness - phase1_brightness
+    
+    return {
+        'brightness_momentum': round(brightness_momentum, 3),
+        'brightness_acceleration': round(brightness_acceleration, 4),
+        'brightness_trend': round(brightness_trend, 2)
+    }
+
+def extract_stream_consistency_features(hue_timeline, brightness_timeline, width_timeline):
+    """
+    FEATURE 4: Stream Consistency Score - How "steady" is the overall extraction?
+    
+    INPUTS: 
+    - hue_timeline: ✅ HAVE from extract_stream_info_from_frame()
+    - brightness_timeline: ✅ HAVE from extract_stream_info_from_frame()  
+    - width_timeline: ✅ HAVE from extract_stream_info_from_frame()
+    - Status: ❌ NOT YET CREATED - we need to build these timelines in main processing loop
+    - How to create: For each frame, collect all 3 values into separate arrays
+    
+    Real-world analogy: Like rating a chef's consistency
+    - Master chef: consistent knife cuts, steady heat, uniform cooking
+    - Amateur chef: uneven cuts, temperature fluctuations, inconsistent results
+    
+    Good espresso: consistent color changes + steady flow + smooth brightness
+    Under-extracted: inconsistent (stops/starts, color jumps, erratic flow)
+    Over-extracted: chaotic (wild variations, unstable extraction)
+    
+    Returns 2 features about overall extraction steadiness:
+    """
+    # Handle edge cases
+    if (not hue_timeline or not brightness_timeline or not width_timeline or
+        len(hue_timeline) < 10 or len(brightness_timeline) < 10 or len(width_timeline) < 10):
+        return {'overall_steadiness': 0, 'phase_uniformity': 0}
+    
+    # Ensure all timelines are same length (they should be)
+    min_length = min(len(hue_timeline), len(brightness_timeline), len(width_timeline))
+    hue_timeline = hue_timeline[:min_length]
+    brightness_timeline = brightness_timeline[:min_length]
+    width_timeline = width_timeline[:min_length]
+    
+    phases = divide_frames_into_phases(min_length)
+    
+    # Feature 4a: Overall Steadiness (combine consistency across all 3 measurements)
+    # Like asking "How consistent is this chef across all cooking skills?"
+    
+    # Calculate individual consistencies (using coefficient of variation = std/mean)
+    def calculate_consistency(timeline):
+        if len(timeline) == 0 or np.mean(timeline) == 0:
+            return 0
+        cv = np.std(timeline) / np.mean(timeline)  # Lower CV (coefficient of variation) = more consistent
+        return 1.0 / (1.0 + cv)  # Invert so higher = more consistent
+    
+    hue_consistency = calculate_consistency(hue_timeline)
+    brightness_consistency = calculate_consistency(brightness_timeline)  
+    width_consistency = calculate_consistency(width_timeline)
+    
+    # __> Overall steadiness is the harmonic mean of all three consistencies
+    # (harmonic mean punishes outliers more than arithmetic mean)
+
+    #this is one of the things we RETURN
+    overall_steadiness = 3.0 / (1.0/hue_consistency + 1.0/brightness_consistency + 1.0/width_consistency) if all([hue_consistency, brightness_consistency, width_consistency]) else 0
+    
+    # Feature 4b: Phase Uniformity (how similar are the 3 phases to each other?)
+    # Like asking "Does this chef cook consistently from appetizer to dessert?"
+    
+    def get_phase_stats(timeline, phases):
+        phase1_mean = np.mean(timeline[phases['phase_1'][0]:phases['phase_1'][1]])
+        phase2_mean = np.mean(timeline[phases['phase_2'][0]:phases['phase_2'][1]])
+        phase3_mean = np.mean(timeline[phases['phase_3'][0]:phases['phase_3'][1]])
+        return [phase1_mean, phase2_mean, phase3_mean]
+    
+    hue_phases = get_phase_stats(hue_timeline, phases)
+    brightness_phases = get_phase_stats(brightness_timeline, phases)
+    width_phases = get_phase_stats(width_timeline, phases)
+    
+    # Calculate how uniform each measurement is across phases (lower variance = more uniform)
+    hue_uniformity = 1.0 / (1.0 + np.var(hue_phases))
+    brightness_uniformity = 1.0 / (1.0 + np.var(brightness_phases))
+    width_uniformity = 1.0 / (1.0 + np.var(width_phases))
+    
+    # Phase uniformity is average of all three uniformities
+    #the second thing we RETURN 
+    phase_uniformity = (hue_uniformity + brightness_uniformity + width_uniformity) / 3.0
+
+    # phase means --> variance of the phases --> average of the variances = phase uniformity
+    
+    return {
+        'overall_steadiness': round(overall_steadiness, 4),
+        'phase_uniformity': round(phase_uniformity, 4)
+    }
+
+print("✅ Feature 4 (Stream Consistency) implemented!")
 
 """
 === NEXT STEPS TO COMPLETE THE NEW FEATURE EXTRACTION SYSTEM ===
 
-STATUS: 2 out of 5 dynamic features completed and tested
-
-REMAINING FEATURES TO IMPLEMENT:
-
-3. **Brightness Momentum** (3 sub-features):
-   - How fast brightness changes over time (like acceleration/deceleration)
-   - Phase-to-phase brightness transitions
-   - Overall brightness trend direction
-   
-4. **Stream Consistency Score** (2 sub-features):  
-   - Overall "steadiness" combining color + width + brightness
-   - Consistency across all three phases (how uniform is the extraction?)
+STATUS: 4 out of 5 dynamic features completed and tested
    
 5. **Phase Transitions** (3 sub-features):
    - Smoothness of transition from phase 1 → 2
    - Smoothness of transition from phase 2 → 3  
    - Overall transition quality score
+
+BEFORE INTEGRATING, trouble shoot the roi capture. Maybe in needs to be adaptive in the upper regions. 
 
 INTEGRATION STEPS NEEDED:
 1. Add remaining 3 feature extraction functions above
