@@ -94,11 +94,14 @@ def run_extraction(category):
         os.makedirs(output_dir,exist_ok=True)
 
 
-        ########### part 2: saving those crucial first 11 seconds 
+        ########### part 2: saving those crucial first 7 seconds (skipping first 1 second)
         frame_count = 0 
         saved_frame_count = 0
         last_valid_frame=None
-
+        
+        # Skip the first 1 second to avoid empty frames before espresso flow starts
+        frames_to_skip = int(fps)  # Skip 1 second worth of frames
+        
         #while that video we opened is valid, and we still have not reached the end of the video
         while cap.isOpened() and saved_frame_count < max_frames:
             #I think ret is if the frame is there and read, and frame is the frame itself
@@ -106,6 +109,11 @@ def run_extraction(category):
             if not ret:
                 break #reached end of vid 
                 #we will get here if ret==False, which means they ain't get that frame
+
+            # Skip frames from the first second to avoid empty frames before flow starts
+            if frame_count < frames_to_skip:
+                frame_count += 1
+                continue
 
             #Let me tell you why this works:
             #so we are still in the while loop
