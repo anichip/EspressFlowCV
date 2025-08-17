@@ -3,6 +3,7 @@
 frames_*/
 data_*/
 features.csv
+features_v2.csv
 pull_times.csv
 __pycache__/
 *.pyc

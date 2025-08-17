@@ -484,3 +484,242 @@ FINAL OUTPUT: features_v2.csv with columns like:
 
 TOTAL: 18 features capturing the complete temporal "story" of espresso extraction!
 """
+
+# ===== MAIN PROCESSING LOOP =====
+
+def process_all_videos():
+    """
+    Main function to process all videos and create features_v2.csv
+    
+    This replaces the simple averaging approach with comprehensive temporal analysis
+    """
+    
+    print("🚀 Starting temporal feature extraction...")
+    print("=" * 60)
+    
+    # Configuration
+    project_root = "/Users/r3alistic/Programming/CoffeeCV"
+    csv_output_path = os.path.join(project_root, "features_v2.csv")
+    
+    frame_folders = [
+        "frames_good_pulls",
+        "frames_under_pulls", 
+        "frames_over_pulls"
+    ]
+    
+    # Check for existing CSV and collect processed videos
+    existing_videos = set()
+    if os.path.exists(csv_output_path):
+        print(f"📄 Found existing {csv_output_path}")
+        with open(csv_output_path, 'r') as existing_file:
+            reader = csv.DictReader(existing_file)
+            for row in reader:
+                existing_videos.add(row["Video_Name"])
+        print(f"⏭️  Skipping {len(existing_videos)} already processed videos")
+    
+    # Main processing
+    all_feature_data = []
+    total_processed = 0
+    
+    for folder_name in frame_folders:
+        folder_path = os.path.join(project_root, folder_name)
+
+        if not os.path.exists(folder_path):
+            print(f"⚠️  Folder {folder_name} not found, skipping...")
+            continue
+            
+        print(f"\n📁 Processing {folder_name}...")
+        category = folder_name.replace("frames_", "").replace("_pulls", "")
+        
+        # Process each video in this category
+        #this already checks if it is a folder of video frames. 
+        video_folders = [f for f in os.listdir(folder_path) if os.path.isdir(os.path.join(folder_path, f))]
+        print(f"   Found {len(video_folders)} videos in {folder_name}")
+        
+        for video_folder in video_folders:
+            if video_folder in existing_videos:
+                print(f"   ⏭️  Skipping {video_folder} (already processed)")
+                continue
+                
+            print(f"   🎬 Processing {video_folder}...")
+            
+            # Process this individual video
+            video_features = process_single_video(folder_path, video_folder, category)
+            
+            if video_features:
+                all_feature_data.append(video_features)
+                total_processed += 1
+                print(f"   ✅ {video_folder} complete ({len(video_features)} features)")
+            else:
+                print(f"   ❌ {video_folder} failed")
+    
+    # Write results
+    if all_feature_data:
+        write_features_to_csv(all_feature_data, csv_output_path)
+        print(f"\n🎉 Processing complete!")
+        print(f"   📊 {total_processed} new videos processed")
+        print(f"   📄 Results saved to: {csv_output_path}")
+    else:
+        print("\n⚠️  No new videos to process")
+        
+    return csv_output_path
+
+def process_single_video(folder_path, video_folder, category):
+    """
+    Process a single video folder to extract all temporal features
+    
+    This is where the magic happens - we build the 3 timelines and extract 18 features!
+    """
+    
+    video_path = os.path.join(folder_path, video_folder)
+    
+    # Get pull duration from the metadata CSV
+    pull_times_csv = os.path.join(folder_path, "pull_times.csv")
+    pull_duration = get_pull_duration(pull_times_csv, video_folder)
+    
+    # Build the three timelines by processing all frames
+    hue_timeline = []
+    brightness_timeline = []
+    width_timeline = []
+    
+    # Get all frame files
+    frame_files = sorted([f for f in os.listdir(video_path) if f.endswith('.jpg')])
+    
+    if len(frame_files) < 30:  # Need minimum frames for temporal analysis
+        print(f"      ⚠️  Only {len(frame_files)} frames found, skipping...")
+        return None
+    
+    print(f"      📽️  Processing {len(frame_files)} frames...")
+    
+    # Process each frame to build timelines
+    frames_processed = 0
+    for frame_file in frame_files:
+        frame_path = os.path.join(video_path, frame_file)
+        frame = cv2.imread(frame_path)
+        
+        if frame is not None:
+            try:
+                hue, brightness, width = extract_stream_info_from_frame(frame)
+                hue_timeline.append(hue)
+                brightness_timeline.append(brightness)
+                width_timeline.append(width)
+                frames_processed += 1
+            except Exception as e:
+                print(f"      ⚠️  Error processing {frame_file}: {e}")
+                continue
+    
+    if frames_processed < 30:
+        print(f"      ❌ Only {frames_processed} frames processed successfully, skipping...")
+        return None
+    
+    print(f"      ✅ Successfully processed {frames_processed} frames")
+    
+    # Extract all 5 feature sets from the timelines
+    try:
+        color_features = extract_color_journey_features(hue_timeline)
+        flow_features = extract_flow_rhythm_features(width_timeline)
+        brightness_features = extract_brightness_momentum_features(brightness_timeline)
+        consistency_features = extract_stream_consistency_features(hue_timeline, brightness_timeline, width_timeline)
+        transition_features = extract_phase_transition_features(hue_timeline, brightness_timeline, width_timeline)
+        
+        # Combine all features into one dictionary
+        all_features = {
+            'Video_Name': video_folder,
+            'Category': category,
+            'Pull_Duration': pull_duration,
+            'Frames_Processed': frames_processed
+        }
+        
+        # Add all feature sets
+        all_features.update(color_features)      # 4 features
+        all_features.update(flow_features)       # 3 features  
+        all_features.update(brightness_features) # 3 features
+        all_features.update(consistency_features) # 2 features
+        all_features.update(transition_features)  # 3 features
+        
+        print(f"      🎯 Extracted {len(all_features)-4} temporal features")  # -4 for metadata
+        return all_features
+        
+    except Exception as e:
+        print(f"      ❌ Feature extraction failed: {e}")
+        return None
+
+def get_pull_duration(pull_times_csv, video_folder):
+    """
+    Get pull duration for a video from the pull_times.csv file
+    """
+    try:
+        if os.path.exists(pull_times_csv):
+            df_pull = pd.read_csv(pull_times_csv)
+            # Clean video names for matching (remove file extensions)
+            df_pull["Video_Name"] = df_pull["Video_Name"].str.lower().str.replace(r"\.(mov|mp4|avi)$", "", regex=True)
+            
+            # Find matching video
+            match = df_pull[df_pull["Video_Name"] == video_folder.lower()]
+            if not match.empty:
+                return match.iloc[0]["Pull_Duration(s)"]
+        
+        print(f"      ⚠️  Pull duration not found for {video_folder}")
+        return np.nan
+        
+    except Exception as e:
+        print(f"      ⚠️  Error reading pull times: {e}")
+        return np.nan
+
+def write_features_to_csv(all_feature_data, csv_output_path):
+    """
+    Write all extracted features to CSV file
+    
+    Creates a comprehensive CSV with 22 columns (4 metadata + 18 temporal features)
+    """
+    
+    if not all_feature_data:
+        print("⚠️  No feature data to write")
+        return
+        
+    # Define column order for consistent CSV structure
+    columns = [
+        # Metadata (4 columns)
+        'Video_Name', 'Category', 'Pull_Duration', 'Frames_Processed',
+        
+        # Color Journey features (4 columns)  
+        'color_progression', 'color_consistency', 'mid_phase_intensity', 'color_change_rate',
+        
+        # Flow Rhythm features (3 columns)
+        'flow_steadiness', 'flow_amplitude', 'flow_trend',
+        
+        # Brightness Momentum features (3 columns)
+        'brightness_momentum', 'brightness_acceleration', 'brightness_trend',
+        
+        # Stream Consistency features (2 columns)
+        'overall_steadiness', 'phase_uniformity',
+        
+        # Phase Transition features (3 columns)
+        'transition_1_2_smoothness', 'transition_2_3_smoothness', 'overall_transition_quality'
+    ]
+    
+    # Check if file exists to determine if we need header
+    write_header = not os.path.exists(csv_output_path)
+    
+    # Write to CSV
+    try:
+        with open(csv_output_path, 'a', newline='') as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=columns)
+            
+            if write_header:
+                writer.writeheader()
+                print(f"📄 Created new CSV with {len(columns)} columns")
+            
+            # Write all feature data
+            for features in all_feature_data:
+                writer.writerow(features)
+                
+        print(f"✅ Successfully wrote {len(all_feature_data)} rows to {csv_output_path}")
+        
+    except Exception as e:
+        print(f"❌ Error writing to CSV: {e}")
+
+if __name__ == "__main__":
+    # Run the main processing when script is executed directly
+    output_file = process_all_videos()
+    print(f"\n✅ Temporal feature extraction complete: {output_file}")
