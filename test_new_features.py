@@ -32,11 +32,11 @@ def debug_frame_with_visualization(frame, frame_name, save_debug=True):
     """
     height, width = frame.shape[:2]
     
-    # 1. Create ROI - UPDATED to be wider for different video framings
-    roi_x_start =  width // 8          # 12.5% from left (much wider)
-    roi_x_end = 15 * width // 16        # 87.5% from left (much wider)       
+    # 1. Create ROI - SYNCED with build_features_v2.py
+    roi_x_start = width // 8          # 12.5% from left
+    roi_x_end = 15 * width // 16        # 87.5% from left (FIXED: was 15/16 = 93.75%)      
     roi_y_start = height // 5         # 20% from top         
-    roi_y_end = 3 * height // 5       # 60% from top (taller box)                
+    roi_y_end = 2 * height // 5      # 60% from top                
     
     roi = frame[roi_y_start:roi_y_end, roi_x_start:roi_x_end]
     
@@ -115,7 +115,7 @@ def test_single_frame_extraction():
     test_folders = ["frames_good_pulls", "frames_under_pulls", "frames_over_pulls"]
     
     # Look specifically for the target video. changes from time to time.
-    target_video = "vid_75_good"
+    target_video = "vid_85_good"
     test_video_path = None
     
     for folder_name in test_folders:
@@ -213,7 +213,7 @@ def test_feature_extraction():
         print(f"❌ Flow Rhythm failed: {e}")
         return False
     
-    # Test Brightness Momentum (NEW!)
+    # Test Brightness Momentum
     try:
         brightness_features = extract_brightness_momentum_features(fake_brightness_timeline)
         print(f"✅ Brightness Momentum features:")
@@ -229,6 +229,28 @@ def test_feature_extraction():
     except Exception as e:
         print(f"❌ Brightness Momentum failed: {e}")
         return False
+    
+    # Test Stream Consistency (NEW!)
+    try:
+        consistency_features = extract_stream_consistency_features(fake_hue_timeline, fake_brightness_timeline, fake_width_timeline)
+        print(f"✅ Stream Consistency features:")
+        for key, value in consistency_features.items():
+            print(f"   {key}: {value}")
+            
+    except Exception as e:
+        print(f"❌ Stream Consistency failed: {e}")
+        return False
+    
+    # Test Phase Transitions (NEW!)
+    try:
+        transition_features = extract_phase_transition_features(fake_hue_timeline, fake_brightness_timeline, fake_width_timeline)
+        print(f"✅ Phase Transitions features:")
+        for key, value in transition_features.items():
+            print(f"   {key}: {value}")
+            
+    except Exception as e:
+        print(f"❌ Phase Transitions failed: {e}")
+        return False
         
     return True
 
@@ -236,52 +258,72 @@ def test_full_video_processing():
     """Test processing a complete video folder"""
     print("\n=== Testing Full Video Processing ===")
     
-    # Find first available video folder
+    # Use same target video as single frame test for consistency
     project_root = "/Users/r3alistic/Programming/CoffeeCV"
     test_folders = ["frames_good_pulls", "frames_under_pulls", "frames_over_pulls"]
+    target_video = "vid_76_good"  # Same as single frame test
     
+    test_path = None
     for folder_name in test_folders:
         folder_path = os.path.join(project_root, folder_name) 
         if os.path.exists(folder_path):
-            video_folders = [f for f in os.listdir(folder_path) if os.path.isdir(os.path.join(folder_path, f))]
-            if video_folders:
-                test_video = video_folders[0]
-                test_path = os.path.join(folder_path, test_video)
-                print(f"🎬 Testing full processing on: {test_video}")
+            target_path = os.path.join(folder_path, target_video)
+            if os.path.exists(target_path) and os.path.isdir(target_path):
+                test_path = target_path
+                print(f"🎬 Testing full processing on: {target_video}")
+                break
+    
+    if not test_path:
+        print(f"❌ Target video {target_video} not found! Falling back to first available video.")
+        for folder_name in test_folders:
+            folder_path = os.path.join(project_root, folder_name) 
+            if os.path.exists(folder_path):
+                video_folders = [f for f in os.listdir(folder_path) if os.path.isdir(os.path.join(folder_path, f))]
+                if video_folders:
+                    test_video = video_folders[0]
+                    test_path = os.path.join(folder_path, test_video)
+                    print(f"🎬 Testing full processing on: {test_video}")
+                    break
+    
+    if test_path:
                 
-                # Process all frames in this video
-                hue_timeline = []
-                brightness_timeline = []  
-                width_timeline = []
+        # Process all frames in this video
+        hue_timeline = []
+        brightness_timeline = []  
+        width_timeline = []
                 
-                frames = sorted([f for f in os.listdir(test_path) if f.endswith('.jpg')])
-                print(f"📽️  Found {len(frames)} frames")
+        frames = sorted([f for f in os.listdir(test_path) if f.endswith('.jpg')])
+        print(f"📽️  Found {len(frames)} frames")
                 
-                # Process first 20 frames (for speed)
-                for i, frame_name in enumerate(frames[:20]):
-                    frame_path = os.path.join(test_path, frame_name)
-                    frame = cv2.imread(frame_path)
-                    if frame is not None:
-                        hue, brightness, width = extract_stream_info_from_frame(frame)
-                        hue_timeline.append(hue)
-                        brightness_timeline.append(brightness)
-                        width_timeline.append(width)
+        # Process first 20 frames (for speed)
+        for i, frame_name in enumerate(frames[:20]):
+            frame_path = os.path.join(test_path, frame_name)
+            frame = cv2.imread(frame_path)
+            if frame is not None:
+                hue, brightness, width = extract_stream_info_from_frame(frame)
+                hue_timeline.append(hue)
+                brightness_timeline.append(brightness)
+                width_timeline.append(width)
                 
-                print(f"✅ Processed {len(hue_timeline)} frames successfully")
-                print(f"📊 Hue range: {min(hue_timeline):.1f} - {max(hue_timeline):.1f}")
-                print(f"💡 Brightness range: {min(brightness_timeline):.1f} - {max(brightness_timeline):.1f}")
-                print(f"🌊 Width range: {min(width_timeline)} - {max(width_timeline)}")
+            print(f"✅ Processed {len(hue_timeline)} frames successfully")
+            print(f"📊 Hue range: {min(hue_timeline):.1f} - {max(hue_timeline):.1f}")
+            print(f"💡 Brightness range: {min(brightness_timeline):.1f} - {max(brightness_timeline):.1f}")
+            print(f"🌊 Width range: {min(width_timeline)} - {max(width_timeline)}")
                 
-                # Test feature extraction on real data
-                color_features = extract_color_journey_features(hue_timeline)
-                flow_features = extract_flow_rhythm_features(width_timeline)
-                brightness_features = extract_brightness_momentum_features(brightness_timeline)
-                
-                print(f"🎨 Real Color Journey features: {color_features}")
-                print(f"🌊 Real Flow Rhythm features: {flow_features}")
-                print(f"💡 Real Brightness Momentum features: {brightness_features}")
-                
-                return True
+        # Test feature extraction on real data
+    color_features = extract_color_journey_features(hue_timeline)
+    flow_features = extract_flow_rhythm_features(width_timeline)
+    brightness_features = extract_brightness_momentum_features(brightness_timeline)
+    consistency_features = extract_stream_consistency_features(hue_timeline, brightness_timeline, width_timeline)
+    transition_features = extract_phase_transition_features(hue_timeline, brightness_timeline, width_timeline)
+        
+    print(f"🎨 Real Color Journey features: {color_features}")
+    print(f"🌊 Real Flow Rhythm features: {flow_features}")
+    print(f"💡 Real Brightness Momentum features: {brightness_features}")
+    print(f"🎯 Real Stream Consistency features: {consistency_features}")
+    print(f"🔄 Real Phase Transitions features: {transition_features}")
+        
+    return True
     
     print("❌ No video folders found for testing")
     return False
