@@ -32,18 +32,19 @@ def debug_frame_with_visualization(frame, frame_name, save_debug=True):
     """
     height, width = frame.shape[:2]
     
-    # 1. Create ROI - SYNCED with build_features_v2.py
-    roi_x_start = width // 8          # 12.5% from left
-    roi_x_end = 15 * width // 16        # 87.5% from left (FIXED: was 15/16 = 93.75%)      
-    roi_y_start = height // 5         # 20% from top         
-    roi_y_end = 2 * height // 5      # 60% from top                
+    # 1. Create ROI - SYNCED with build_features_v2.py ENHANCED WIDE ROI
+    roi_x_start = width // 9         # 10% from left (wider capture)
+    roi_x_end = 9 * width // 10      # 90% from left (wider capture)
+    roi_y_start = height // 8         # 12.5% from top (higher, catches portafilter)         
+    roi_y_end = height // 2     # 70% from top (deeper, catches short mugs)                
     
     roi = frame[roi_y_start:roi_y_end, roi_x_start:roi_x_end]
     
     # 2. Color filtering
     hsv_roi = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
-    lower_espresso = np.array([8, 40, 15])    
-    upper_espresso = np.array([30, 255, 180])  
+    # FILTERED SPECTRUM - Light beige to rich brown, excluding reflections (synced with build_features_v2.py)
+    lower_espresso = np.array([8, 25, 40])     # Light beige but NOT reflections
+    upper_espresso = np.array([35, 255, 240])  # Rich dark brown (very inclusive)  
     espresso_mask = cv2.inRange(hsv_roi, lower_espresso, upper_espresso)
     
     # 3. Stream detection
@@ -60,8 +61,9 @@ def debug_frame_with_visualization(frame, frame_name, save_debug=True):
         contour_center_x = x + w // 2
         distance_from_center = abs(contour_center_x - roi_center_x)
         
-        is_valid = (h > 40 and w > 3 and aspect_ratio > 2.0 and 
-                   distance_from_center < roi.shape[1] // 3)
+        # RELAXED criteria - synced with build_features_v2.py
+        is_valid = (h > 15 and w > 1 and aspect_ratio > 1.2 and 
+                   distance_from_center < roi.shape[1] // 2)
         
         valid_contours.append({
             'contour': cnt,
@@ -106,28 +108,45 @@ def debug_frame_with_visualization(frame, frame_name, save_debug=True):
     
     return hue_mean, brightness_mean, stream_width, len(contours), len(valid_widths)
 
-def test_single_frame_extraction():
-    """Test frame extraction on multiple frames with debug visualization"""
-    print("\n=== Testing Single Frame Extraction with Debug ===")
-    
-    # Find a frames folder to test with
+def find_test_video(target_video="vid_10_good"):
+    """
+    Helper function to find a test video folder
+    Returns (video_path, video_name) or (None, None) if not found
+    """
     project_root = "/Users/r3alistic/Programming/CoffeeCV"
     test_folders = ["frames_good_pulls", "frames_under_pulls", "frames_over_pulls"]
     
-    # Look specifically for the target video. changes from time to time.
-    target_video = "vid_85_good"
-    test_video_path = None
-    
+    # Look for specific target video first
     for folder_name in test_folders:
         folder_path = os.path.join(project_root, folder_name)
         if os.path.exists(folder_path):
             target_path = os.path.join(folder_path, target_video)
             if os.path.exists(target_path) and os.path.isdir(target_path):
-                test_video_path = target_path
                 print(f"📁 Found target video: {target_video}")
-                break
+                return target_path, target_video
     
-    if not test_video_path or not os.path.exists(test_video_path):
+    # Fallback to first available video
+    print(f"❌ Target video {target_video} not found! Falling back to first available video.")
+    for folder_name in test_folders:
+        folder_path = os.path.join(project_root, folder_name) 
+        if os.path.exists(folder_path):
+            video_folders = [f for f in os.listdir(folder_path) if os.path.isdir(os.path.join(folder_path, f))]
+            if video_folders:
+                fallback_video = video_folders[0]
+                fallback_path = os.path.join(folder_path, fallback_video)
+                print(f"🎬 Using fallback video: {fallback_video}")
+                return fallback_path, fallback_video
+    
+    return None, None
+
+def test_single_frame_extraction():
+    """Test frame extraction on multiple frames with debug visualization"""
+    print("\n=== Testing Single Frame Extraction with Debug ===")
+    
+    # Find test video using helper function
+    test_video_path, target_video = find_test_video()  # Uses default vid_69_good
+    
+    if not test_video_path:
         print("❌ No test video found! Make sure you have extracted frames.")
         return False
     
@@ -258,32 +277,8 @@ def test_full_video_processing():
     """Test processing a complete video folder"""
     print("\n=== Testing Full Video Processing ===")
     
-    # Use same target video as single frame test for consistency
-    project_root = "/Users/r3alistic/Programming/CoffeeCV"
-    test_folders = ["frames_good_pulls", "frames_under_pulls", "frames_over_pulls"]
-    target_video = "vid_76_good"  # Same as single frame test
-    
-    test_path = None
-    for folder_name in test_folders:
-        folder_path = os.path.join(project_root, folder_name) 
-        if os.path.exists(folder_path):
-            target_path = os.path.join(folder_path, target_video)
-            if os.path.exists(target_path) and os.path.isdir(target_path):
-                test_path = target_path
-                print(f"🎬 Testing full processing on: {target_video}")
-                break
-    
-    if not test_path:
-        print(f"❌ Target video {target_video} not found! Falling back to first available video.")
-        for folder_name in test_folders:
-            folder_path = os.path.join(project_root, folder_name) 
-            if os.path.exists(folder_path):
-                video_folders = [f for f in os.listdir(folder_path) if os.path.isdir(os.path.join(folder_path, f))]
-                if video_folders:
-                    test_video = video_folders[0]
-                    test_path = os.path.join(folder_path, test_video)
-                    print(f"🎬 Testing full processing on: {test_video}")
-                    break
+    # Use helper function to find test video
+    test_path, test_video = find_test_video()  # Uses default vid_69_good
     
     if test_path:
                 
@@ -305,28 +300,29 @@ def test_full_video_processing():
                 brightness_timeline.append(brightness)
                 width_timeline.append(width)
                 
-            print(f"✅ Processed {len(hue_timeline)} frames successfully")
+        print(f"✅ Processed {len(hue_timeline)} frames successfully")
+        if hue_timeline:  # Only print ranges if we have data
             print(f"📊 Hue range: {min(hue_timeline):.1f} - {max(hue_timeline):.1f}")
             print(f"💡 Brightness range: {min(brightness_timeline):.1f} - {max(brightness_timeline):.1f}")
             print(f"🌊 Width range: {min(width_timeline)} - {max(width_timeline)}")
                 
-        # Test feature extraction on real data
-    color_features = extract_color_journey_features(hue_timeline)
-    flow_features = extract_flow_rhythm_features(width_timeline)
-    brightness_features = extract_brightness_momentum_features(brightness_timeline)
-    consistency_features = extract_stream_consistency_features(hue_timeline, brightness_timeline, width_timeline)
-    transition_features = extract_phase_transition_features(hue_timeline, brightness_timeline, width_timeline)
-        
-    print(f"🎨 Real Color Journey features: {color_features}")
-    print(f"🌊 Real Flow Rhythm features: {flow_features}")
-    print(f"💡 Real Brightness Momentum features: {brightness_features}")
-    print(f"🎯 Real Stream Consistency features: {consistency_features}")
-    print(f"🔄 Real Phase Transitions features: {transition_features}")
-        
-    return True
-    
-    print("❌ No video folders found for testing")
-    return False
+            # Test feature extraction on real data
+            color_features = extract_color_journey_features(hue_timeline)
+            flow_features = extract_flow_rhythm_features(width_timeline)
+            brightness_features = extract_brightness_momentum_features(brightness_timeline)
+            consistency_features = extract_stream_consistency_features(hue_timeline, brightness_timeline, width_timeline)
+            transition_features = extract_phase_transition_features(hue_timeline, brightness_timeline, width_timeline)
+                
+            print(f"🎨 Real Color Journey features: {color_features}")
+            print(f"🌊 Real Flow Rhythm features: {flow_features}")
+            print(f"💡 Real Brightness Momentum features: {brightness_features}")
+            print(f"🎯 Real Stream Consistency features: {consistency_features}")
+            print(f"🔄 Real Phase Transitions features: {transition_features}")
+                
+        return True
+    else:
+        print("❌ No video found for testing")
+        return False
 
 if __name__ == "__main__":
     print("🧪 Testing New Feature Extraction Functions")

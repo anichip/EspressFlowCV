@@ -36,32 +36,36 @@ def extract_stream_info_from_frame(frame):
     NEW APPROACH - Much smarter stream detection:
     1. ROI: Only look in center-mid-top area (where espresso actually flows)
     2. Color filtering: Target brown/amber colors, not just "dark stuff" 
-    3. Shape filtering: Streams are tall & thin, not random blobs
+    3. Shape filtering: Streams are tall & thin, not random brown blobs
     4. Position consistency: Stream should be vertically oriented in center
     """
     
     height, width = frame.shape[:2]
     
-    # 1. REGION OF INTEREST (ROI) - Focus on MIDDLE area where stream flows (not bottom pool!)
-    # Like looking through a window at the flowing stream, not the accumulated coffee
-
-    #let us try going even wider
-    roi_x_start = width // 8          # Start at 12.5% from left
-    roi_x_end = 15 * width // 16     # End at 93.75% from left  
-    roi_y_start = height // 5         # Start at 20% from top (maybe a little porta filter area would be nice)
-    roi_y_end =  3 * height // 5    # Changed --> End at 60% from top (AVOID bottom accumulation!)
+    # 1. REGION OF INTEREST (ROI) - OPTIMIZED for reliable stream capture across all mug heights
+    # Strategy: Wide capture (portafilter to container top) based on "container always directly under"
+    
+    # {[[This is fairly easy to understand. We're telling the computer to only look here for coffee streams]]}
+    
+    # ENHANCED WIDE ROI - Captures streams from portafilter to container rim reliably
+    roi_x_start = width // 9         # Start at 10% from left (wider than 12.5%)
+    roi_x_end = 9 * width // 10      # End at 90% from left (wider than 93.75%)
+    roi_y_start = height // 8         # Start at 12.5% from top (higher to catch portafilter area) 
+    roi_y_end = height // 2     # End at 70% from top (deeper to catch short mugs, avoid bottom pool)
     
     roi = frame[roi_y_start:roi_y_end, roi_x_start:roi_x_end]
     
     # 2. COLOR FILTERING - Look for espresso colors specifically
     hsv_roi = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
     
-    # Define espresso color ranges in HSV (brown/amber tones)
-    # Hue: 10-25 (brown/orange range), Saturation: 50-255, Value: 20-150 (not too bright)
-    lower_espresso = np.array([8, 40, 15])    # Lighter brown
-    upper_espresso = np.array([30, 255, 180])  # Darker brown
+    # Define espresso color ranges in HSV - FILTERED to avoid chrome/steel reflections
+    # Hue: 8-35 (slightly higher to avoid very pale reflections)
+    # Saturation: 25-255 (higher minimum to filter out washed-out reflections) 
+    # Value: 40-240 (avoid very bright reflective surfaces)
+    lower_espresso = np.array([8, 25, 40])     # Light beige but NOT reflections
+    upper_espresso = np.array([35, 255, 240])  # Rich dark brown (keep inclusive)
     
-    # Create mask for espresso colors
+    # Create mask for espresso colors. Everything brown becomes white and everything else becomes black
     espresso_mask = cv2.inRange(hsv_roi, lower_espresso, upper_espresso)
     
     # For overall color analysis, use the espresso-colored pixels only
@@ -86,6 +90,7 @@ def extract_stream_info_from_frame(frame):
     valid_widths = []
     roi_center_x = roi.shape[1] // 2  # Center of our ROI
     
+    #we want to filter for stream shapes only
     for cnt in contours:
         x, y, w, h = cv2.boundingRect(cnt)
         
@@ -94,11 +99,12 @@ def extract_stream_info_from_frame(frame):
         contour_center_x = x + w // 2
         distance_from_center = abs(contour_center_x - roi_center_x)
         
-        # Filter criteria for a valid espresso stream:
-        if (h > 40 and                      # Minimum height (streams are tall)
-            w > 3 and                       # Minimum width  
-            aspect_ratio > 2.0 and          # Should be taller than wide (vertical stream)
-            distance_from_center < roi.shape[1] // 3):  # Should be near center
+        # RELAXED Filter criteria for espresso streams - be more permissive!
+        if (h > 15 and                      # Much lower height requirement  
+            w > 1 and                       # Allow very thin streams
+            aspect_ratio > 1.2 and          # More forgiving aspect ratio (was 2.0)
+            distance_from_center < roi.shape[1] // 2):  # Allow streams further from center
+
             valid_widths.append(w)
     
     # Use the widest valid stream (main flow)
