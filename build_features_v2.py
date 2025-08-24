@@ -48,9 +48,9 @@ def extract_stream_info_from_frame(frame):
     # {[[This is fairly easy to understand. We're telling the computer to only look here for coffee streams]]}
     
     # ENHANCED WIDE ROI - Captures streams from portafilter to container rim reliably
-    roi_x_start = width // 9         # Start at 10% from left (wider than 12.5%)
+    roi_x_start = width // 9         # Start at 11% from left (wider than 12.5%)
     roi_x_end = 9 * width // 10      # End at 90% from left (wider than 93.75%)
-    roi_y_start = height // 8         # Start at 12.5% from top (higher to catch portafilter area) 
+    roi_y_start = height // 7         # Start at 14% from top (higher to catch portafilter area) 
     roi_y_end = height // 2     # End at 70% from top (deeper to catch short mugs, avoid bottom pool)
     
     roi = frame[roi_y_start:roi_y_end, roi_x_start:roi_x_end]
@@ -509,8 +509,7 @@ def process_all_videos():
     
     frame_folders = [
         "frames_good_pulls",
-        "frames_under_pulls", 
-        "frames_over_pulls"
+        "frames_under_pulls"
     ]
     
     # Check for existing CSV and collect processed videos

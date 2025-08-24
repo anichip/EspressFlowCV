@@ -172,7 +172,7 @@ def run_extraction(category):
 ############### MAIN 
 
 #removed perfect and mid and added "good"
-categories = ["good","over","under"]
+categories = ["good","under"]
 for cat in categories:
     run_extraction(cat)
     print(f"✅ Gabruuuuuuu Completed {cat} category extraction\n")

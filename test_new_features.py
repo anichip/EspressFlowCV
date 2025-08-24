@@ -33,9 +33,9 @@ def debug_frame_with_visualization(frame, frame_name, save_debug=True):
     height, width = frame.shape[:2]
     
     # 1. Create ROI - SYNCED with build_features_v2.py ENHANCED WIDE ROI
-    roi_x_start = width // 9         # 10% from left (wider capture)
+    roi_x_start = width // 9         #  from left (wider capture)
     roi_x_end = 9 * width // 10      # 90% from left (wider capture)
-    roi_y_start = height // 8         # 12.5% from top (higher, catches portafilter)         
+    roi_y_start = height // 7        #  from top (higher, catches portafilter)         
     roi_y_end = height // 2     # 70% from top (deeper, catches short mugs)                
     
     roi = frame[roi_y_start:roi_y_end, roi_x_start:roi_x_end]
@@ -114,7 +114,7 @@ def find_test_video(target_video="vid_10_good"):
     Returns (video_path, video_name) or (None, None) if not found
     """
     project_root = "/Users/r3alistic/Programming/CoffeeCV"
-    test_folders = ["frames_good_pulls", "frames_under_pulls", "frames_over_pulls"]
+    test_folders = ["frames_good_pulls", "frames_under_pulls"]
     
     # Look for specific target video first
     for folder_name in test_folders:
