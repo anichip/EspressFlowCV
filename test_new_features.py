@@ -33,23 +33,23 @@ def debug_frame_with_visualization(frame, frame_name, save_debug=True):
     height, width = frame.shape[:2]
     
     # 1. Create ROI - SYNCED with build_features_v2.py ENHANCED WIDE ROI
-    roi_x_start = width // 9         #  from left (wider capture)
-    roi_x_end = 9 * width // 10      # 90% from left (wider capture)
-    roi_y_start = height // 7        #  from top (higher, catches portafilter)         
+    roi_x_start = width // 11         #  from left (wider capture)
+    roi_x_end = 10 * width // 11      # 90% from left (wider capture)
+    roi_y_start = height // 6        #  from top (higher, catches portafilter)         
     roi_y_end = height // 2     # 70% from top (deeper, catches short mugs)                
     
     roi = frame[roi_y_start:roi_y_end, roi_x_start:roi_x_end]
     
-    # 2. Color filtering
-    hsv_roi = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
-    # FILTERED SPECTRUM - Light beige to rich brown, excluding reflections (synced with build_features_v2.py)
-    lower_espresso = np.array([8, 25, 40])     # Light beige but NOT reflections
-    upper_espresso = np.array([35, 255, 240])  # Rich dark brown (very inclusive)  
-    espresso_mask = cv2.inRange(hsv_roi, lower_espresso, upper_espresso)
+    # 2. Edge-based detection (synced with build_features_v2.py)
+    gray_roi = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
+    blurred_gray = cv2.GaussianBlur(gray_roi, (5, 5), 0)
+    edges = cv2.Canny(blurred_gray, 50, 150)
     
-    # 3. Stream detection
-    blurred_mask = cv2.GaussianBlur(espresso_mask, (5, 5), 0)
-    contours, _ = cv2.findContours(blurred_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    # For color analysis
+    hsv_roi = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
+    
+    # 3. Stream detection from edges
+    contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     
     # 4. Filter contours and collect info
     valid_contours = []
@@ -61,9 +61,9 @@ def debug_frame_with_visualization(frame, frame_name, save_debug=True):
         contour_center_x = x + w // 2
         distance_from_center = abs(contour_center_x - roi_center_x)
         
-        # RELAXED criteria - synced with build_features_v2.py
-        is_valid = (h > 15 and w > 1 and aspect_ratio > 1.2 and 
-                   distance_from_center < roi.shape[1] // 2)
+        # EDGE-BASED criteria - synced with build_features_v2.py
+        area = cv2.contourArea(cnt)
+        is_valid = (h > 30 and w > 2 and aspect_ratio > 2.0 and area > 100)
         
         valid_contours.append({
             'contour': cnt,
@@ -95,20 +95,21 @@ def debug_frame_with_visualization(frame, frame_name, save_debug=True):
         # Save debug images
         cv2.imwrite(f"debug_{frame_name}_original.jpg", debug_frame)
         cv2.imwrite(f"debug_{frame_name}_roi.jpg", roi_debug) 
-        cv2.imwrite(f"debug_{frame_name}_mask.jpg", espresso_mask)
+        cv2.imwrite(f"debug_{frame_name}_edges.jpg", edges)
+        cv2.imwrite(f"debug_{frame_name}_blurred.jpg", blurred_gray)
         
         print(f"🔍 Debug images saved: debug_{frame_name}_*.jpg")
     
     # Return actual measurements
-    hue_mean = np.mean(hsv_roi[:, :, 0])  # Fallback to whole ROI
-    brightness_mean = np.mean(cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY))
+    hue_mean = np.mean(hsv_roi[:, :, 0])  # Simple average hue of ROI
+    brightness_mean = np.mean(gray_roi)
     
     valid_widths = [info['bbox'][2] for info in valid_contours if info['is_valid']]
     stream_width = max(valid_widths) if valid_widths else 0
     
     return hue_mean, brightness_mean, stream_width, len(contours), len(valid_widths)
 
-def find_test_video(target_video="vid_10_good"):
+def find_test_video(target_video="vid_99_good"):
     """
     Helper function to find a test video folder
     Returns (video_path, video_name) or (None, None) if not found

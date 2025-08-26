@@ -55,36 +55,27 @@ def extract_stream_info_from_frame(frame):
     
     roi = frame[roi_y_start:roi_y_end, roi_x_start:roi_x_end]
     
-    # 2. COLOR FILTERING - Look for espresso colors specifically
-    hsv_roi = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
-    
-    # Define espresso color ranges in HSV - FILTERED to avoid chrome/steel reflections
-    # Hue: 8-35 (slightly higher to avoid very pale reflections)
-    # Saturation: 25-255 (higher minimum to filter out washed-out reflections) 
-    # Value: 40-240 (avoid very bright reflective surfaces)
-    lower_espresso = np.array([8, 25, 40])     # Light beige but NOT reflections
-    upper_espresso = np.array([35, 255, 240])  # Rich dark brown (keep inclusive)
-    
-    # Create mask for espresso colors. Everything brown becomes white and everything else becomes black
-    espresso_mask = cv2.inRange(hsv_roi, lower_espresso, upper_espresso)
-    
-    # For overall color analysis, use the espresso-colored pixels only
-    espresso_pixels = hsv_roi[espresso_mask > 0]
-    if len(espresso_pixels) > 0:
-        hue_mean = np.mean(espresso_pixels[:, 0])  # Average hue of actual espresso
-    else:
-        hue_mean = np.mean(hsv_roi[:, :, 0])  # Fallback to whole ROI
-    
-    # Brightness analysis (on ROI only)
+    # 2. EDGE-BASED DETECTION - More robust than color filtering
+    # Convert to grayscale for edge detection
     gray_roi = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
+    
+    # Apply Gaussian blur to reduce noise
+    blurred_gray = cv2.GaussianBlur(gray_roi, (5, 5), 0)
+    
+    # Edge detection with Canny
+    edges = cv2.Canny(blurred_gray, 50, 150)
+    
+    # For color analysis, use HSV on the ROI (independent of stream detection)
+    hsv_roi = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
+    hue_mean = np.mean(hsv_roi[:, :, 0])  # Simple average hue of ROI
+    
+    # Brightness analysis (on ROI only)  
     brightness_mean = np.mean(gray_roi)
     
-    # 3. STREAM WIDTH DETECTION - Much smarter approach
-    # Apply Gaussian blur and use the espresso color mask
-    blurred_mask = cv2.GaussianBlur(espresso_mask, (5, 5), 0)
+    # 3. STREAM WIDTH DETECTION - Edge-based approach
     
-    # Find contours in the espresso-colored regions
-    contours, _ = cv2.findContours(blurred_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    # Find contours from edge detection
+    contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     
     # 4. SHAPE & POSITION FILTERING - Only keep stream-like contours
     valid_widths = []
@@ -99,11 +90,12 @@ def extract_stream_info_from_frame(frame):
         contour_center_x = x + w // 2
         distance_from_center = abs(contour_center_x - roi_center_x)
         
-        # RELAXED Filter criteria for espresso streams - be more permissive!
-        if (h > 15 and                      # Much lower height requirement  
-            w > 1 and                       # Allow very thin streams
-            aspect_ratio > 1.2 and          # More forgiving aspect ratio (was 2.0)
-            distance_from_center < roi.shape[1] // 2):  # Allow streams further from center
+        # EDGE-BASED Filter criteria for espresso streams - optimized for edge contours!
+        area = cv2.contourArea(cnt)
+        if (h > 30 and                      # Minimum height for streams
+            w > 2 and                       # Allow thin streams 
+            aspect_ratio > 2.0 and          # More vertical than horizontal
+            area > 100):                    # Minimum area to filter noise
 
             valid_widths.append(w)
     
