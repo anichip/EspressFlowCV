@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 from dataclasses import dataclass
 from typing import List, Dict, Optional, Tuple
+import random
 
 # ---------------------------
 # Configuration dataclasses
@@ -15,10 +16,10 @@ from typing import List, Dict, Optional, Tuple
 class ROIConfig:
     # Fractional ROI (x0, y0, x1, y1) relative to frame size
     # (top-left roi 0 , bottom-right roi 1)
-    x0: float = 0.32
+    x0: float = 0.15
     y0: float = 0.15
-    x1: float = 0.68
-    y1: float = 0.80
+    x1: float = 0.85
+    y1: float = 0.55
 
 # What are the qualifications for being espresso? 
 
@@ -443,6 +444,14 @@ def process_frames_folder(folder: str,
             gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
             # gray = cv2.medianBlur(gray,3) #noise reduction #<>IF NEEDED<>#
             columns_for_kymo.append(np.sum(255 - gray, axis=0))
+
+        #as far as overlays, I don't want everyone to have an overlay. I just want some of them to have an overlay. 
+        # rand = random.random()
+        # debug.save_overlay_video = rand < 0.25 #about 25% probability
+
+        #new approach: I always wanted to choose which ones I wanted to debug. Just these 6 for now
+        select_vids = ["frames_good_pulls/vid_2_good","frames_good_pulls/vid_14_good","frames_good_pulls/vid_47_good","frames_good_pulls/vid_97_good","frames_under_pulls/vid_18_under","frames_under_pulls/vid_74_under"]
+        debug.save_overlay_video = folder in select_vids
 
         #write the debug overlay video to evaluate
         if debug.save_overlay_video:
