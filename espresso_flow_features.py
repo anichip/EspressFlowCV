@@ -16,9 +16,9 @@ import random
 class ROIConfig:
     # Fractional ROI (x0, y0, x1, y1) relative to frame size
     # (top-left roi 0 , bottom-right roi 1)
-    x0: float = 0.15
-    y0: float = 0.15
-    x1: float = 0.85
+    x0: float = 0.11
+    y0: float = 0.17
+    x1: float = 0.86
     y1: float = 0.55
 
 # What are the qualifications for being espresso? 
@@ -28,7 +28,7 @@ class Thresholds:
     # Motion
     flow_mag_thresh: float = 1.2 #min optical flow magnitude to consider pixels moving
     min_area: int = 150   # in pixels, after ROI. Throw out those tiny specks. Have to be large enough to be considered
-    min_height: int = 25  # bounding box height
+    min_height: int = 25  # streams are tall
     min_aspect: float = 1.4  # h/w ratio (tall & thin)
 
     # Color (HSV in OpenCV ranges: H:0..180, S:0..255, V:0..255)
@@ -37,7 +37,9 @@ class Thresholds:
     #these bottom three are for excluding noise
     s_lo: int = 40   
     v_lo: int = 20  
-    v_hi: int = 230  
+    v_hi: int = 230
+
+    position_bias: str = "offcenter"  # options: "center" | "neutral" | "offcenter"
 
     #<>TROUBLESHOOTING<>#
     #too many false positives from metal glare? --> raise s_lo and lower v_hi (less bright stuff allowed)
@@ -91,17 +93,32 @@ def _roi_rect(shape, roi_cfg: ROIConfig) -> Tuple[int, int, int, int]:
 # Input: horizontal center, roi width, area, 
 # Output: Component score
 
-def _component_score(cx, roi_w, area):
+def _component_score(cx, roi_w, area, aspect, bias="neutral"):
+
+    # base: larger area and taller/thinner shapes are better
+    base = area * max(1e-6, aspect)
+
     center = roi_w / 2.0
     dist = abs(cx - center) / max(1.0, roi_w / 2.0)
-    edge_penalty = 0.7 #our videos are centered, so 70% is okay 
-    return area * (1.0 - edge_penalty * dist)
+    edge_penalty = 0.7 #our videos are centered, so 70% is okay for being that much off center
+
+    if bias == "center" :
+        return base * (1.0 - edge_penalty * dist)
+    elif bias == "offcenter":
+        offcenter_bonus = 0.7 + 0.3 * dist               # 0.7..1.0
+        return base * offcenter_bonus
+    else:
+        #neutral
+        return base
 
 # Given all candidate contours from "motion and color" mask, pick the blob that looks most like a fallen stream
 # Input: Roi width, contours from cv2, Thresholds object with the qualifications for an espresso stream
 # Output: 
 
 def _best_component(contours, roi_w, thr: Thresholds):
+
+    bias = thr.position_bias
+
     best = None
     best_score = 0.0
     for c in contours:
@@ -115,7 +132,7 @@ def _best_component(contours, roi_w, thr: Thresholds):
         if aspect < thr.min_aspect:
             continue
         cx = x + w / 2.0
-        score = _component_score(cx, roi_w, area) #^
+        score = _component_score(cx, roi_w, area, aspect, bias) #^
         if score > best_score:
             best_score = score
             best = (x, y, w, h, area, cx, y + h/2.0)
@@ -257,6 +274,11 @@ class EspressoStreamSegmenter:
         color_mask = cv2.inRange(hsv,
                                  (self.thr.h_lo, self.thr.s_lo, self.thr.v_lo),
                                  (self.thr.h_hi, 255, self.thr.v_hi))
+
+        #<>CAN COMMENT OUT IF IT DOESN'T WORK
+        # Remove very bright, low-saturation pixels (chrome reflections)
+        glare_mask = cv2.inRange(hsv, (0, 0, 200), (180, 60, 255))
+        color_mask = cv2.bitwise_and(color_mask, cv2.bitwise_not(glare_mask))
 
         stream_mask = cv2.bitwise_and(motion_mask, color_mask)
 
