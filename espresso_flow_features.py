@@ -27,17 +27,17 @@ class ROIConfig:
 class Thresholds:
     # Motion
     flow_mag_thresh: float = 1.3 #min optical flow magnitude to consider pixels moving
-    min_area: int = 225   # in pixels, after ROI. Throw out those tiny specks. Have to be large enough to be considered
+    min_area: int = 205   # in pixels, after ROI. Throw out those tiny specks. Have to be large enough to be considered
     min_height: int = 35  # streams are tall
-    min_aspect: float = 1.6  # h/w ratio (tall & thin)
+    min_aspect: float = 1.5  # h/w ratio (higher means tall & thin)
 
     # Color (HSV in OpenCV ranges: H:0..180, S:0..255, V:0..255)
-    h_lo: int = 5     # "light brown/amber" lower hue 
+    h_lo: int = 8     # "light brown/amber" lower hue 
     h_hi: int = 28    # "rich brown/amber" upper hue
     #these bottom three are for excluding noise
-    s_lo: int = 85   
+    s_lo: int = 75   
     v_lo: int = 25  
-    v_hi: int = 185
+    v_hi: int = 190
 
     position_bias: str = "offcenter"  # options: "center" | "neutral" | "offcenter"
 
