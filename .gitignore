@@ -18,3 +18,5 @@ CLAUDE.md
 debug_*.jpg
 !debug_early_frame_070_original.jpg
 !debug_middle_frame_210_roi.jpg
+
+demo_espresso.db
