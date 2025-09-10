@@ -20,3 +20,11 @@ debug_*.jpg
 !debug_middle_frame_210_roi.jpg
 
 demo_espresso.db
+
+#All Mds
+API_SERVER_STATUS.md
+README_APP.md
+
+test_api.py
+
+/iOS_App/
