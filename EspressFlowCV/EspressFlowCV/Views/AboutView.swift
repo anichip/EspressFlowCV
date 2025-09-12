@@ -23,7 +23,7 @@ struct AboutView: View {
                     
                     // Developer Info
                     InfoSection(title: "Developer") {
-                        Text("Built with love for coffee ☕")
+                        Text("Built with love for coding and coffee ☕")
                             .font(.body)
                             .multilineTextAlignment(.center)
                     }
@@ -61,7 +61,7 @@ struct AboutView: View {
                     InfoSection(title: "Technology") {
                         VStack(alignment: .leading, spacing: 8) {
                             TechRow(label: "Computer Vision", value: "OpenCV")
-                            TechRow(label: "Machine Learning", value: "Random Forest")
+                            TechRow(label: "Machine Learning", value: "Scikit-Learn")
                             TechRow(label: "Accuracy", value: "86% ROC-AUC")
                             TechRow(label: "Features Analyzed", value: "10 flow characteristics")
                             TechRow(label: "Processing Time", value: "~5-10 seconds")
@@ -69,15 +69,15 @@ struct AboutView: View {
                     }
                     
                     // Tips Section
-                    InfoSection(title: "Pro Tips") {
-                        VStack(alignment: .leading, spacing: 8) {
-                            TipRow("Use consistent lighting for best results")
-                            TipRow("Keep camera steady during recording")
-                            TipRow("Position cup directly under portafilter")
-                            TipRow("Record from a front-center angle")
-                            TipRow("Clean portafilter regularly for clear analysis")
-                        }
-                    }
+//                    InfoSection(title: "Pro Tips") {
+//                        VStack(alignment: .leading, spacing: 8) {
+//                            TipRow("Use consistent lighting for best results")
+//                            TipRow("Keep camera steady during recording")
+//                            TipRow("Position cup directly under portafilter")
+//                            TipRow("Record from a front-center angle")
+//                            TipRow("Clean portafilter regularly for clear analysis")
+//                        }
+//                    }
                     
                     Spacer(minLength: 40)
                 }

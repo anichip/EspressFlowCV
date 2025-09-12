@@ -20,11 +20,39 @@ struct RecordingView: View {
                 
                 // Camera Preview Area
                 ZStack {
-                    // Camera preview placeholder
-                    Rectangle()
-                        .fill(Color.black)
-                        .aspectRatio(16/9, contentMode: .fit)
-                        .cornerRadius(12)
+                    // Live camera preview
+                    if cameraManager.isAuthorized, let session = cameraManager.captureSession {
+                        CameraPreview(session: session)
+                            .aspectRatio(16/9, contentMode: .fit)
+                            .cornerRadius(12)
+                            .clipped()
+                    } else {
+                        // Fallback when camera isn't available
+                        Rectangle()
+                            .fill(Color.black)
+                            .aspectRatio(16/9, contentMode: .fit)
+                            .cornerRadius(12)
+                            .overlay(
+                                VStack(spacing: 8) {
+                                    Image(systemName: cameraManager.isAuthorized ? "camera.fill" : "camera.badge.exclamationmark")
+                                        .font(.system(size: 40))
+                                        .foregroundColor(.white.opacity(0.6))
+                                    
+                                    Text(cameraManager.isAuthorized ? "Camera Loading..." : "Camera Access Required")
+                                        .foregroundColor(.white.opacity(0.8))
+                                        .font(.subheadline)
+                                        .multilineTextAlignment(.center)
+                                    
+                                    if !cameraManager.isAuthorized {
+                                        Text("Enable camera access in Settings")
+                                            .foregroundColor(.white.opacity(0.6))
+                                            .font(.caption)
+                                            .multilineTextAlignment(.center)
+                                    }
+                                }
+                                .padding()
+                            )
+                    }
                     
                     // ROI Guide Overlay
                     ROIGuideView()
@@ -85,7 +113,7 @@ struct RecordingView: View {
                                 .fontWeight(.medium)
                         }
                     }
-                    .disabled(isAnalyzing)
+                    .disabled(isAnalyzing || !cameraManager.isAuthorized)
                     
                     // Tips button
                     Button(action: {
@@ -119,6 +147,12 @@ struct RecordingView: View {
                     analysisResult = nil
                 }
             }
+        }
+        .onAppear {
+            cameraManager.startSession()
+        }
+        .onDisappear {
+            cameraManager.stopSession()
         }
         .overlay(
             // Analysis overlay

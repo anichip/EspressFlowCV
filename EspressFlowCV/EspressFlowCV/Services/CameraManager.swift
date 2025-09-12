@@ -4,8 +4,9 @@ import SwiftUI
 class CameraManager: NSObject, ObservableObject {
     @Published var isRecording = false
     @Published var recordingDuration: Double = 0.0
+    @Published var isAuthorized = false
     
-    private var captureSession: AVCaptureSession?
+    var captureSession: AVCaptureSession?
     private var videoOutput: AVCaptureMovieFileOutput?
     private var recordingTimer: Timer?
     private var recordingURL: URL?
@@ -13,43 +14,79 @@ class CameraManager: NSObject, ObservableObject {
     
     override init() {
         super.init()
-        setupCamera()
+        requestCameraPermission()
+    }
+    
+    private func requestCameraPermission() {
+        switch AVCaptureDevice.authorizationStatus(for: .video) {
+        case .authorized:
+            DispatchQueue.main.async {
+                self.isAuthorized = true
+            }
+            setupCamera()
+        case .notDetermined:
+            AVCaptureDevice.requestAccess(for: .video) { granted in
+                DispatchQueue.main.async {
+                    self.isAuthorized = granted
+                    if granted {
+                        self.setupCamera()
+                    }
+                }
+            }
+        case .denied, .restricted:
+            DispatchQueue.main.async {
+                self.isAuthorized = false
+            }
+        @unknown default:
+            DispatchQueue.main.async {
+                self.isAuthorized = false
+            }
+        }
     }
     
     private func setupCamera() {
-        captureSession = AVCaptureSession()
-        
-        guard let captureSession = captureSession else { return }
-        
-        // Configure session for high quality
-        captureSession.sessionPreset = .high
-        
-        // Add video input
-        guard let videoDevice = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
-              let videoInput = try? AVCaptureDeviceInput(device: videoDevice) else {
-            print("Failed to create video input")
-            return
-        }
-        
-        if captureSession.canAddInput(videoInput) {
-            captureSession.addInput(videoInput)
-        }
-        
-        // Add audio input
-        guard let audioDevice = AVCaptureDevice.default(for: .audio),
-              let audioInput = try? AVCaptureDeviceInput(device: audioDevice) else {
-            print("Failed to create audio input")
-            return
-        }
-        
-        if captureSession.canAddInput(audioInput) {
-            captureSession.addInput(audioInput)
-        }
-        
-        // Add video output
-        videoOutput = AVCaptureMovieFileOutput()
-        if let videoOutput = videoOutput, captureSession.canAddOutput(videoOutput) {
-            captureSession.addOutput(videoOutput)
+        // Setup capture session on background thread
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let self = self else { return }
+            
+            let session = AVCaptureSession()
+            
+            // Configure session for high quality
+            session.sessionPreset = .high
+            
+            // Add video input
+            guard let videoDevice = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
+                  let videoInput = try? AVCaptureDeviceInput(device: videoDevice) else {
+                print("Failed to create video input")
+                return
+            }
+            
+            if session.canAddInput(videoInput) {
+                session.addInput(videoInput)
+            }
+            
+            // Add audio input
+            guard let audioDevice = AVCaptureDevice.default(for: .audio),
+                  let audioInput = try? AVCaptureDeviceInput(device: audioDevice) else {
+                print("Failed to create audio input")
+                return
+            }
+            
+            if session.canAddInput(audioInput) {
+                session.addInput(audioInput)
+            }
+            
+            // Add video output
+            let output = AVCaptureMovieFileOutput()
+            if session.canAddOutput(output) {
+                session.addOutput(output)
+            }
+            
+            // Update properties on main thread
+            DispatchQueue.main.async {
+                self.captureSession = session
+                self.videoOutput = output
+            }
         }
     }
     
