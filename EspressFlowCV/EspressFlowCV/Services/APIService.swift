@@ -6,9 +6,14 @@ class APIService {
     
     // MARK: - Health Check
     func healthCheck() async throws -> [String: Any] {
-        let url = URL(string: "\(baseURL)/health")!
+        guard let url = URL(string: "\(baseURL)/health") else {
+            throw APIError.invalidURL
+        }
         let (data, _) = try await session.data(from: url)
-        return try JSONSerialization.jsonObject(with: data) as! [String: Any]
+        guard let result = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw APIError.invalidResponse
+        }
+        return result
     }
     
     // MARK: - Get Shots
@@ -18,7 +23,9 @@ class APIService {
             urlString += "?limit=\(limit)"
         }
         
-        let url = URL(string: urlString)!
+        guard let url = URL(string: urlString) else {
+            throw APIError.invalidURL
+        }
         let (data, _) = try await session.data(from: url)
         
         let response = try JSONDecoder().decode(ShotsResponse.self, from: data)
@@ -27,7 +34,9 @@ class APIService {
     
     // MARK: - Get Summary
     func getSummary() async throws -> ShotsSummary {
-        let url = URL(string: "\(baseURL)/stats")!
+        guard let url = URL(string: "\(baseURL)/stats") else {
+            throw APIError.invalidURL
+        }
         let (data, _) = try await session.data(from: url)
         
         let response = try JSONDecoder().decode(StatsResponse.self, from: data)
@@ -36,7 +45,9 @@ class APIService {
     
     // MARK: - Delete Shot
     func deleteShot(shotId: Int) async throws {
-        let url = URL(string: "\(baseURL)/shots/\(shotId)")!
+        guard let url = URL(string: "\(baseURL)/shots/\(shotId)") else {
+            throw APIError.invalidURL
+        }
         var request = URLRequest(url: url)
         request.httpMethod = "DELETE"
         
@@ -50,7 +61,9 @@ class APIService {
     
     // MARK: - Analyze Video
     func analyzeVideo(videoURL: URL, metadata: [String: Any] = [:]) async throws -> EspressoShot {
-        let url = URL(string: "\(baseURL)/analyze")!
+        guard let url = URL(string: "\(baseURL)/analyze") else {
+            throw APIError.invalidURL
+        }
         
         // Create multipart form data
         let boundary = UUID().uuidString
@@ -62,22 +75,36 @@ class APIService {
         
         // Add video file
         let videoData = try Data(contentsOf: videoURL)
-        body.append("--\(boundary)\r\n".data(using: .utf8)!)
-        body.append("Content-Disposition: form-data; name=\"video\"; filename=\"espresso_shot.mp4\"\r\n".data(using: .utf8)!)
-        body.append("Content-Type: video/mp4\r\n\r\n".data(using: .utf8)!)
+        guard let boundaryData = "--\(boundary)\r\n".data(using: .utf8),
+              let headerData = "Content-Disposition: form-data; name=\"video\"; filename=\"espresso_shot.mp4\"\r\n".data(using: .utf8),
+              let typeData = "Content-Type: video/mp4\r\n\r\n".data(using: .utf8),
+              let endData = "\r\n".data(using: .utf8) else {
+            throw APIError.encodingError
+        }
+        body.append(boundaryData)
+        body.append(headerData)
+        body.append(typeData)
         body.append(videoData)
-        body.append("\r\n".data(using: .utf8)!)
+        body.append(endData)
         
         // Add metadata if provided
         if !metadata.isEmpty {
             let metadataJSON = try JSONSerialization.data(withJSONObject: metadata)
-            body.append("--\(boundary)\r\n".data(using: .utf8)!)
-            body.append("Content-Disposition: form-data; name=\"metadata\"\r\n\r\n".data(using: .utf8)!)
+            guard let metaBoundaryData = "--\(boundary)\r\n".data(using: .utf8),
+                  let metaHeaderData = "Content-Disposition: form-data; name=\"metadata\"\r\n\r\n".data(using: .utf8),
+                  let metaEndData = "\r\n".data(using: .utf8) else {
+                throw APIError.encodingError
+            }
+            body.append(metaBoundaryData)
+            body.append(metaHeaderData)
             body.append(metadataJSON)
-            body.append("\r\n".data(using: .utf8)!)
+            body.append(metaEndData)
         }
         
-        body.append("--\(boundary)--\r\n".data(using: .utf8)!)
+        guard let finalBoundaryData = "--\(boundary)--\r\n".data(using: .utf8) else {
+            throw APIError.encodingError
+        }
+        body.append(finalBoundaryData)
         request.httpBody = body
         
         let (data, response) = try await session.data(for: request)
@@ -134,6 +161,8 @@ enum APIError: Error, LocalizedError {
     case deleteFailed
     case analysisRequestFailed
     case invalidResponse
+    case invalidURL
+    case encodingError
     
     var errorDescription: String? {
         switch self {
@@ -143,6 +172,10 @@ enum APIError: Error, LocalizedError {
             return "Video analysis request failed"
         case .invalidResponse:
             return "Invalid response from server"
+        case .invalidURL:
+            return "Invalid API URL"
+        case .encodingError:
+            return "Data encoding error"
         }
     }
 }

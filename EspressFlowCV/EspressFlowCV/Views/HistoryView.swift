@@ -20,7 +20,7 @@ struct HistoryView: View {
                 }
                 .padding()
             }
-            .navigationTitle("Shot History")
+            .navigationTitle("Pull History")
             .refreshable {
                 await appState.refreshShots()
                 await appState.refreshSummary()

@@ -23,14 +23,15 @@ struct RecordingView: View {
                     // Live camera preview
                     if cameraManager.isAuthorized, let session = cameraManager.captureSession {
                         CameraPreview(session: session)
-                            .aspectRatio(16/9, contentMode: .fit)
+                            .frame(maxHeight: 500)
                             .cornerRadius(12)
                             .clipped()
                     } else {
                         // Fallback when camera isn't available
                         Rectangle()
                             .fill(Color.black)
-                            .aspectRatio(16/9, contentMode: .fit)
+                            .frame(maxHeight: 500)
+                            .aspectRatio(9/16, contentMode: .fit)
                             .cornerRadius(12)
                             .overlay(
                                 VStack(spacing: 8) {
