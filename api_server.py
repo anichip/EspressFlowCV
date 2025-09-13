@@ -18,6 +18,7 @@ from database.espresso_db import EspressoDatabase
 import cv2
 import joblib
 import pandas as pd
+import numpy as np
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -88,8 +89,8 @@ def classify_with_trained_model(features_dict: Dict) -> tuple:
             if feature_name in features_dict:
                 feature_values.append(features_dict[feature_name])
             else:
-                # Missing feature - use median imputation (model will handle this)
-                feature_values.append(0.0)
+                # Missing feature - use NaN so SimpleImputer can handle it properly
+                feature_values.append(np.nan)
                 logger.warning(f"Missing feature: {feature_name}")
         
         # Create DataFrame with proper column names
