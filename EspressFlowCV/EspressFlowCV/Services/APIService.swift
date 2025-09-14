@@ -1,12 +1,12 @@
 import Foundation
 
 class APIService {
-    private let baseURL = "http://localhost:5000/api"
+    private let baseURL = "http://192.168.86.53:5000"
     private let session = URLSession.shared
     
     // MARK: - Health Check
     func healthCheck() async throws -> [String: Any] {
-        guard let url = URL(string: "\(baseURL)/health") else {
+        guard let url = URL(string: "\(baseURL)/api/health") else {
             throw APIError.invalidURL
         }
         let (data, _) = try await session.data(from: url)
@@ -18,7 +18,7 @@ class APIService {
     
     // MARK: - Get Shots
     func getShots(limit: Int? = nil) async throws -> [EspressoShot] {
-        var urlString = "\(baseURL)/shots"
+        var urlString = "\(baseURL)/api/shots"
         if let limit = limit {
             urlString += "?limit=\(limit)"
         }
@@ -34,7 +34,7 @@ class APIService {
     
     // MARK: - Get Summary
     func getSummary() async throws -> ShotsSummary {
-        guard let url = URL(string: "\(baseURL)/stats") else {
+        guard let url = URL(string: "\(baseURL)/api/stats") else {
             throw APIError.invalidURL
         }
         let (data, _) = try await session.data(from: url)
@@ -45,7 +45,7 @@ class APIService {
     
     // MARK: - Delete Shot
     func deleteShot(shotId: Int) async throws {
-        guard let url = URL(string: "\(baseURL)/shots/\(shotId)") else {
+        guard let url = URL(string: "\(baseURL)/api/shots/\(shotId)") else {
             throw APIError.invalidURL
         }
         var request = URLRequest(url: url)
@@ -61,7 +61,7 @@ class APIService {
     
     // MARK: - Analyze Video
     func analyzeVideo(videoURL: URL, metadata: [String: Any] = [:]) async throws -> EspressoShot {
-        guard let url = URL(string: "\(baseURL)/analyze") else {
+        guard let url = URL(string: "\(baseURL)/api/analyze") else {
             throw APIError.invalidURL
         }
         

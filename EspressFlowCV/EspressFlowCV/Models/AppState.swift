@@ -11,7 +11,7 @@ struct EspressoShot: Identifiable, Codable {
     let features: [String: Double]?
     let videoDurationS: Double?
     let notes: String
-    
+
     enum CodingKeys: String, CodingKey {
         case id
         case filename
@@ -21,6 +21,55 @@ struct EspressoShot: Identifiable, Codable {
         case features
         case videoDurationS = "video_duration_s"
         case notes
+        // Ignore extra fields from API: created_at, updated_at, features_json
+    }
+
+    // Regular memberwise initializer
+    init(id: Int, filename: String, recordedAt: Date, analysisResult: String, confidence: Double, features: [String: Double]?, videoDurationS: Double?, notes: String) {
+        self.id = id
+        self.filename = filename
+        self.recordedAt = recordedAt
+        self.analysisResult = analysisResult
+        self.confidence = confidence
+        self.features = features
+        self.videoDurationS = videoDurationS
+        self.notes = notes
+    }
+
+    // Custom decoder to handle extra fields and date parsing
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+
+        id = try container.decode(Int.self, forKey: .id)
+        filename = try container.decode(String.self, forKey: .filename)
+        analysisResult = try container.decode(String.self, forKey: .analysisResult)
+        confidence = try container.decode(Double.self, forKey: .confidence)
+        features = try container.decodeIfPresent([String: Double].self, forKey: .features)
+        videoDurationS = try container.decodeIfPresent(Double.self, forKey: .videoDurationS)
+        notes = try container.decode(String.self, forKey: .notes)
+
+        // Handle date parsing - API returns ISO string
+        let dateString = try container.decode(String.self, forKey: .recordedAt)
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        recordedAt = formatter.date(from: dateString) ?? Date()
+    }
+
+    // Custom encoder to maintain compatibility
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+
+        try container.encode(id, forKey: .id)
+        try container.encode(filename, forKey: .filename)
+        try container.encode(analysisResult, forKey: .analysisResult)
+        try container.encode(confidence, forKey: .confidence)
+        try container.encodeIfPresent(features, forKey: .features)
+        try container.encodeIfPresent(videoDurationS, forKey: .videoDurationS)
+        try container.encode(notes, forKey: .notes)
+
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        try container.encode(formatter.string(from: recordedAt), forKey: .recordedAt)
     }
     
     var isGoodShot: Bool {
