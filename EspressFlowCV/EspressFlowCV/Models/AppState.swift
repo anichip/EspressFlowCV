@@ -109,17 +109,35 @@ class AppState: ObservableObject {
     @Published var summary: ShotsSummary?
     @Published var isLoading = false
     @Published var errorMessage: String?
-    
+    @Published var isRetrying = false
+
     private let apiService = APIService()
-    
+    private var retryCount = 0
+    private let maxRetries = 3
+
     init() {
         loadData()
     }
     
     func loadData() {
         Task {
+            await performInitialSetup()
+        }
+    }
+
+    @MainActor
+    private func performInitialSetup() async {
+        // First, try to discover a working server
+        print("🔍 Performing initial server discovery...")
+        let serverFound = await apiService.discoverServer()
+
+        if serverFound {
+            print("✅ Server discovered, loading data...")
             await refreshShots()
             await refreshSummary()
+        } else {
+            print("❌ No server found during initial setup")
+            errorMessage = "Unable to connect to server. Please check your network connection and ensure the API server is running."
         }
     }
     
@@ -127,17 +145,48 @@ class AppState: ObservableObject {
     func refreshShots() async {
         isLoading = true
         errorMessage = nil
-        
+        retryCount = 0
+
+        await attemptShotsRefresh()
+    }
+
+    @MainActor
+    private func attemptShotsRefresh() async {
         do {
             let shots = try await apiService.getShots()
             print("📊 Loaded \(shots.count) shots from API")
             self.shots = shots
+            self.errorMessage = nil
+            self.retryCount = 0
+            self.isRetrying = false
         } catch {
-            print("❌ Failed to load shots: \(error)")
-            self.errorMessage = "Failed to load shots: \(error.localizedDescription)"
+            print("❌ Failed to load shots (attempt \(retryCount + 1)): \(error)")
+
+            if retryCount < maxRetries {
+                retryCount += 1
+                isRetrying = true
+                errorMessage = "Retrying connection... (attempt \(retryCount)/\(maxRetries))"
+
+                // Exponential backoff: 1s, 2s, 4s
+                let delay = TimeInterval(pow(2.0, Double(retryCount - 1)))
+                print("🔄 Retrying in \(delay) seconds...")
+
+                try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                await attemptShotsRefresh()
+            } else {
+                isRetrying = false
+                errorMessage = error.localizedDescription
+            }
         }
-        
+
         isLoading = false
+    }
+
+    @MainActor
+    func retryConnection() async {
+        guard !isLoading && !isRetrying else { return }
+        retryCount = 0
+        await refreshShots()
     }
     
     @MainActor

@@ -638,5 +638,8 @@ if __name__ == '__main__':
     print(f"🤖 ML Model: {'✅ Loaded' if model_loaded else '❌ Not found (run train_model.py)'}")
     print(f"🌐 Health check: http://localhost:5000/api/health")
     
+    # Get port from environment (Railway sets this automatically)
+    port = int(os.environ.get('PORT', 5000))
+
     # For production, use gunicorn or similar WSGI server
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=port, debug=False)

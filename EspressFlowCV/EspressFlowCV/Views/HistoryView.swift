@@ -5,6 +5,7 @@ struct HistoryView: View {
     @EnvironmentObject var appState: AppState
     @State private var showingDeleteAlert = false
     @State private var shotToDelete: EspressoShot?
+    @Environment(\.scenePhase) private var scenePhase
     
     var body: some View {
         NavigationView {
@@ -24,6 +25,15 @@ struct HistoryView: View {
             .refreshable {
                 await appState.refreshShots()
                 await appState.refreshSummary()
+            }
+            .onChange(of: scenePhase) { newPhase in
+                if newPhase == .active {
+                    // Refresh data when app becomes active (e.g., from background)
+                    Task {
+                        await appState.refreshShots()
+                        await appState.refreshSummary()
+                    }
+                }
             }
         }
         .alert("Delete Shot", isPresented: $showingDeleteAlert) {
@@ -57,9 +67,29 @@ struct HistoryView: View {
             }
             
             if appState.shots.isEmpty {
-                if appState.isLoading {
-                    ProgressView("Loading shots...")
-                        .padding()
+                if appState.isLoading || appState.isRetrying {
+                    VStack(spacing: 12) {
+                        ProgressView()
+                        if appState.isRetrying {
+                            Text(appState.errorMessage ?? "Retrying connection...")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        } else {
+                            Text("Loading shots...")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    .padding()
+                } else if appState.errorMessage != nil {
+                    ErrorStateView(
+                        message: appState.errorMessage!,
+                        onRetry: {
+                            Task {
+                                await appState.retryConnection()
+                            }
+                        }
+                    )
                 } else {
                     EmptyStateView()
                 }
@@ -207,6 +237,43 @@ struct ShotRowView: View {
     }
 }
 
+// MARK: - Error State
+struct ErrorStateView: View {
+    let message: String
+    let onRetry: () -> Void
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "wifi.exclamationmark")
+                .font(.system(size: 50))
+                .foregroundColor(.orange)
+
+            Text("Connection Error")
+                .font(.title3)
+                .fontWeight(.medium)
+
+            Text(message)
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal)
+
+            Button(action: onRetry) {
+                HStack {
+                    Image(systemName: "arrow.clockwise")
+                    Text("Retry Connection")
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 10)
+                .background(Color.blue)
+                .foregroundColor(.white)
+                .cornerRadius(8)
+            }
+        }
+        .padding(40)
+    }
+}
+
 // MARK: - Empty State
 struct EmptyStateView: View {
     var body: some View {
@@ -214,11 +281,11 @@ struct EmptyStateView: View {
             Image(systemName: "cup.and.saucer")
                 .font(.system(size: 60))
                 .foregroundColor(.brown.opacity(0.5))
-            
+
             Text("No shots yet")
                 .font(.title3)
                 .fontWeight(.medium)
-            
+
             Text("Record your first espresso shot to see your progress here!")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
