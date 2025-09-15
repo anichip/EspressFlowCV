@@ -13,6 +13,10 @@ from datetime import datetime
 import logging
 from typing import Dict, Any, Optional
 
+# Configure logging first
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 # Import your existing modules
 try:
     from database.postgres_db import EspressoPostgreSQLDatabase as EspressoDatabase
@@ -25,9 +29,7 @@ import joblib
 import pandas as pd
 import numpy as np
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# Logger already configured above
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for mobile app requests
