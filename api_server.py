@@ -14,7 +14,12 @@ import logging
 from typing import Dict, Any, Optional
 
 # Import your existing modules
-from database.espresso_db import EspressoDatabase
+try:
+    from database.postgres_db import EspressoPostgreSQLDatabase as EspressoDatabase
+    logger.info("Using PostgreSQL database for production")
+except ImportError:
+    from database.espresso_db import EspressoDatabase
+    logger.info("Using SQLite database for development")
 import cv2
 import joblib
 import pandas as pd
@@ -33,7 +38,18 @@ API_VERSION = "1.0"
 MAX_VIDEO_SIZE_MB = 100  # 50MB max video size
 
 # Initialize database
-db = EspressoDatabase("espresso_shots.db")
+# In production (Railway), use PostgreSQL with DATABASE_URL
+# In development, fall back to SQLite
+try:
+    if os.environ.get('DATABASE_URL'):
+        db = EspressoDatabase()  # PostgreSQL (no argument needed, uses env var)
+        logger.info("✅ Connected to PostgreSQL database")
+    else:
+        db = EspressoDatabase("espresso_shots.db")  # SQLite for local development
+        logger.info("✅ Connected to SQLite database")
+except Exception as e:
+    logger.error(f"❌ Database initialization failed: {str(e)}")
+    raise
 
 # Global model variables (loaded on startup)
 MODEL = None
