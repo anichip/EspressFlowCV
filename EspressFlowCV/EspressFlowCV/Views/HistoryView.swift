@@ -70,7 +70,7 @@ struct HistoryView: View {
             }
         }
         .padding()
-        .background(Color.gray.opacity(0.1))
+        .background(Color(.systemGray6))
         .cornerRadius(12)
     }
 }
@@ -101,7 +101,7 @@ struct ProgressSectionView: View {
             }
         }
         .padding()
-        .background(Color.brown.opacity(0.1))
+        .background(Color(.systemGray6))
         .cornerRadius(12)
     }
 }
@@ -196,9 +196,9 @@ struct ShotRowView: View {
             }
         }
         .padding()
-        .background(Color.white)
+        .background(Color(.systemBackground))
         .cornerRadius(8)
-        .shadow(radius: 1)
+        .shadow(color: Color.primary.opacity(0.1), radius: 1)
     }
 }
 

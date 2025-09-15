@@ -108,12 +108,18 @@ class APIService {
         request.httpBody = body
         
         let (data, response) = try await session.data(for: request)
-        
-        guard let httpResponse = response as? HTTPURLResponse,
-              httpResponse.statusCode == 200 else {
+
+        guard let httpResponse = response as? HTTPURLResponse else {
             throw APIError.analysisRequestFailed
         }
-        
+
+        if httpResponse.statusCode != 200 {
+            // Try to get error message from server
+            let errorMessage = String(data: data, encoding: .utf8) ?? "Unknown server error"
+            print("🚨 Server error (\(httpResponse.statusCode)): \(errorMessage)")
+            throw APIError.serverError(httpResponse.statusCode, errorMessage)
+        }
+
         let analysisResponse = try JSONDecoder().decode(AnalysisResponse.self, from: data)
         
         // Convert to EspressoShot
@@ -145,14 +151,27 @@ private struct AnalysisResponse: Codable {
     let filename: String
     let analysisResult: String
     let confidence: Double
-    let features: [String: Double]
-    
+    let features: [String: Double]?
+
     enum CodingKeys: String, CodingKey {
         case shotId = "shot_id"
         case filename
         case analysisResult = "analysis_result"
         case confidence
         case features
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+
+        shotId = try container.decode(Int.self, forKey: .shotId)
+        filename = try container.decode(String.self, forKey: .filename)
+        analysisResult = try container.decode(String.self, forKey: .analysisResult)
+        confidence = try container.decode(Double.self, forKey: .confidence)
+
+        // Skip features parsing due to mixed types
+        features = nil
+        print("⚠️ Skipping features parsing in AnalysisResponse due to mixed types")
     }
 }
 
@@ -163,7 +182,8 @@ enum APIError: Error, LocalizedError {
     case invalidResponse
     case invalidURL
     case encodingError
-    
+    case serverError(Int, String)
+
     var errorDescription: String? {
         switch self {
         case .deleteFailed:
@@ -176,6 +196,8 @@ enum APIError: Error, LocalizedError {
             return "Invalid API URL"
         case .encodingError:
             return "Data encoding error"
+        case .serverError(let code, let message):
+            return "Server error (\(code)): \(message)"
         }
     }
 }

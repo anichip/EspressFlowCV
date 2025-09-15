@@ -44,7 +44,9 @@ struct EspressoShot: Identifiable, Codable {
         filename = try container.decode(String.self, forKey: .filename)
         analysisResult = try container.decode(String.self, forKey: .analysisResult)
         confidence = try container.decode(Double.self, forKey: .confidence)
-        features = try container.decodeIfPresent([String: Double].self, forKey: .features)
+        // Handle features - skip entirely for now since it contains mixed types
+        features = nil
+        print("⚠️ Skipping features parsing due to mixed types (string + double)")
         videoDurationS = try container.decodeIfPresent(Double.self, forKey: .videoDurationS)
         notes = try container.decode(String.self, forKey: .notes)
 

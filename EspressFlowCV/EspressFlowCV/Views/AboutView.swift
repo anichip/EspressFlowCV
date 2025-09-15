@@ -62,9 +62,9 @@ struct AboutView: View {
                         VStack(alignment: .leading, spacing: 8) {
                             TechRow(label: "Computer Vision", value: "OpenCV")
                             TechRow(label: "Machine Learning", value: "Scikit-Learn")
-                            TechRow(label: "Accuracy", value: "86% ROC-AUC")
-                            TechRow(label: "Features Analyzed", value: "10 flow characteristics")
-                            TechRow(label: "Processing Time", value: "~5-10 seconds")
+                            TechRow(label: "Backend", value: "Flask API")
+                            TechRow(label: "Database", value: "SQLite")
+                            TechRow(label: "Frontend", value: "Swift")
                         }
                     }
                     

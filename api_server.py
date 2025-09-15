@@ -30,7 +30,7 @@ CORS(app)  # Enable CORS for mobile app requests
 # Configuration
 UPLOAD_FOLDER = tempfile.mkdtemp(prefix='espresso_uploads_')
 API_VERSION = "1.0"
-MAX_VIDEO_SIZE_MB = 50  # 50MB max video size
+MAX_VIDEO_SIZE_MB = 100  # 50MB max video size
 
 # Initialize database
 db = EspressoDatabase("espresso_shots.db")
@@ -197,17 +197,18 @@ def analyze_espresso_shot():
         
         logger.info(f"Processing video: {filename} ({file_size_mb:.1f}MB)")
         
-        # Process with your existing CV pipeline
-        analysis_result = process_video_for_api(temp_video_path, video_id)
-        
-        # Get optional metadata
+        # Extract metadata first
         metadata = {}
         if 'metadata' in request.form:
             import json
             try:
                 metadata = json.loads(request.form['metadata'])
+                print(f"INFO:__main__:Received metadata: {metadata}")
             except json.JSONDecodeError:
                 logger.warning("Invalid metadata JSON, using defaults")
+
+        # Process with your existing CV pipeline
+        analysis_result = process_video_for_api(temp_video_path, video_id, metadata)
         
         # Store in database
         shot_id = db.add_shot(
@@ -344,7 +345,7 @@ def get_statistics():
         logger.error(f"Failed to get stats: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
-def process_video_for_api(video_path: str, video_id: str) -> Dict[str, Any]:
+def process_video_for_api(video_path: str, video_id: str, metadata: Dict = None) -> Dict[str, Any]:
     """
     Wrapper around your existing CV pipeline for API use
     Uses extract_frames.py then process_frames_folder
@@ -398,9 +399,15 @@ def process_video_for_api(video_path: str, video_id: str) -> Dict[str, Any]:
         
         # Now use your existing process_frames_folder function
         from espresso_flow_features import process_frames_folder, simple_rule_classifier
-        
+
         features_dict = process_frames_folder(frames_folder)
-        
+
+        # Add duration from metadata if provided (more accurate than CV calculation)
+        if metadata and 'pull_duration_s' in metadata:
+            features_dict['pull_duration_s'] = metadata['pull_duration_s']
+            duration_s = metadata['pull_duration_s']  # Use metadata duration
+            print(f"INFO:__main__:Using metadata duration: {duration_s:.2f}s")
+
         # Use trained ML model instead of simple rule classifier
         classification, confidence = classify_with_trained_model(features_dict)
         

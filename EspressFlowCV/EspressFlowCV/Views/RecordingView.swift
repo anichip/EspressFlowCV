@@ -1,141 +1,116 @@
 import SwiftUI
 import AVFoundation
+import UIKit
+import MobileCoreServices
 
 struct RecordingView: View {
     @EnvironmentObject var appState: AppState
-    @StateObject private var cameraManager = CameraManager()
     @State private var showingTips = false
     @State private var isAnalyzing = false
     @State private var analysisResult: EspressoShot?
     @State private var showingResult = false
+    @State private var showingImagePicker = false
     
     var body: some View {
         NavigationView {
-            VStack(spacing: 20) {
-                // Header
-                Text("EspressFlowCV")
-                    .font(.largeTitle)
-                    .fontWeight(.bold)
-                    .foregroundColor(.brown)
+            ZStack {
+                VStack(spacing: 20) {
+                    // Header with coffee icon
+                    HStack(spacing: 8) {
+                        Image(systemName: "cup.and.saucer.fill")
+                            .font(.title)
+                            .foregroundColor(.brown)
+
+                        Text("EspressFlowCV")
+                            .font(.largeTitle)
+                            .fontWeight(.bold)
+                            .foregroundColor(.brown)
+                    }
                 
-                // Camera Preview Area
-                ZStack {
-                    // Live camera preview
-                    if cameraManager.isAuthorized, let session = cameraManager.captureSession {
-                        CameraPreview(session: session)
-                            .frame(maxHeight: 500)
-                            .cornerRadius(12)
-                            .clipped()
-                    } else {
-                        // Fallback when camera isn't available
-                        Rectangle()
-                            .fill(Color.black)
-                            .frame(maxHeight: 500)
-                            .aspectRatio(9/16, contentMode: .fit)
-                            .cornerRadius(12)
-                            .overlay(
-                                VStack(spacing: 8) {
-                                    Image(systemName: cameraManager.isAuthorized ? "camera.fill" : "camera.badge.exclamationmark")
-                                        .font(.system(size: 40))
-                                        .foregroundColor(.white.opacity(0.6))
-                                    
-                                    Text(cameraManager.isAuthorized ? "Camera Loading..." : "Camera Access Required")
-                                        .foregroundColor(.white.opacity(0.8))
-                                        .font(.subheadline)
-                                        .multilineTextAlignment(.center)
-                                    
-                                    if !cameraManager.isAuthorized {
-                                        Text("Enable camera access in Settings")
-                                            .foregroundColor(.white.opacity(0.6))
-                                            .font(.caption)
-                                            .multilineTextAlignment(.center)
-                                    }
-                                }
-                                .padding()
-                            )
+                // Instructions Area
+                VStack(spacing: 20) {
+//                    Image(systemName: "cup.and.saucer")
+//                        .font(.system(size: 80))
+//                        .foregroundColor(.brown)
+
+                    Text("Ready to Analyze Your Espresso Shot?")
+                        .font(.title2)
+                        .fontWeight(.semibold)
+                        .multilineTextAlignment(.center)
+
+                    // Example setup image
+                    Image("espresso_sample")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(maxHeight: 325)
+                        .cornerRadius(8)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color.brown.opacity(0.3), lineWidth: 1)
+                        )
+
+                    VStack(spacing: 12) {
+                        Text("• Orient setup as shown above")
+                        Text("• Tap record to open iPhone camera")
+//                        Text("• Record your extraction (7+ seconds)")
+//                        Text("• We'll analyze the flow quality")
                     }
-                    
-                    // ROI Guide Overlay
-                    ROIGuideView()
-                    
-                    // Recording indicator
-                    if cameraManager.isRecording {
-                        VStack {
-                            HStack {
-                                Circle()
-                                    .fill(Color.red)
-                                    .frame(width: 12, height: 12)
-                                    .scaleEffect(cameraManager.isRecording ? 1.0 : 0.0)
-                                    .animation(.easeInOut(duration: 1.0).repeatForever(), value: cameraManager.isRecording)
-                                
-                                Text("Recording: \(cameraManager.recordingDuration, specifier: "%.1f")s")
-                                    .foregroundColor(.white)
-                                    .fontWeight(.medium)
-                                
-                                Spacer()
-                            }
-                            .padding()
-                            Spacer()
-                        }
-                    }
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.leading)
                 }
+                .padding()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color(.systemGray6))
+                )
                 .padding(.horizontal)
                 
-                // Encouragement message
-                Text("Record when you're ready champ! 🎬")
-                    .font(.title2)
-                    .foregroundColor(.primary)
-                    .multilineTextAlignment(.center)
                 
-                // Recording progress bar (when recording)
-                if cameraManager.isRecording {
-                    ProgressView(value: cameraManager.recordingDuration, total: 10.0)
-                        .progressViewStyle(LinearProgressViewStyle(tint: .brown))
-                        .padding(.horizontal, 40)
-                }
                 
+
+                Spacer()
+
                 // Action buttons
                 HStack(spacing: 30) {
                     // Record button
                     Button(action: {
-                        if cameraManager.isRecording {
-                            stopRecording()
-                        } else {
-                            startRecording()
-                        }
+                        showingImagePicker = true
                     }) {
                         VStack {
-                            Image(systemName: cameraManager.isRecording ? "stop.circle.fill" : "record.circle")
+                            Image(systemName: "record.circle")
                                 .font(.system(size: 50))
-                                .foregroundColor(cameraManager.isRecording ? .red : .brown)
-                            
-                            Text(cameraManager.isRecording ? "STOP" : "RECORD")
+                                .foregroundColor(.brown)
+
+                            Text("RECORD")
                                 .font(.caption)
                                 .fontWeight(.medium)
                         }
                     }
-                    .disabled(isAnalyzing || !cameraManager.isAuthorized)
-                    
+                    .disabled(isAnalyzing)
+
                     // Tips button
                     Button(action: {
                         showingTips = true
                     }) {
                         VStack {
                             Image(systemName: "lightbulb")
-                                .font(.system(size: 40))
+                                .font(.system(size: 50))
                                 .foregroundColor(.orange)
-                            
+
                             Text("Tips")
                                 .font(.caption)
                                 .fontWeight(.medium)
                         }
                     }
                 }
-                .padding(.bottom, 20)
+                .padding(.bottom, 50)
                 
-                Spacer()
+                }
+                .navigationBarHidden(true)
+
             }
-            .navigationBarHidden(true)
         }
         .sheet(isPresented: $showingTips) {
             TipsView()
@@ -145,15 +120,15 @@ struct RecordingView: View {
                 ResultView(shot: result) {
                     // Add to app state
                     appState.addNewShot(result)
-                    analysisResult = nil
+                    showingResult = false  // Dismiss sheet properly
+                    analysisResult = nil   // Clear result after dismissing
                 }
             }
         }
-        .onAppear {
-            cameraManager.startSession()
-        }
-        .onDisappear {
-            cameraManager.stopSession()
+        .sheet(isPresented: $showingImagePicker) {
+            ImagePicker(onVideoPicked: { url in
+                analyzeVideoWithDuration(url: url)
+            })
         }
         .overlay(
             // Analysis overlay
@@ -180,31 +155,51 @@ struct RecordingView: View {
         )
     }
     
-    private func startRecording() {
-        cameraManager.startRecording()
-    }
     
-    private func stopRecording() {
-        cameraManager.stopRecording { videoURL in
-            if let url = videoURL {
-                analyzeVideo(url: url)
+    private func analyzeVideoWithDuration(url: URL) {
+        Task {
+            do {
+                // Get video duration using iOS 16+ API
+                let asset = AVURLAsset(url: url)
+                let duration = try await asset.load(.duration)
+                let durationInSeconds = CMTimeGetSeconds(duration)
+
+                print("📹 Video duration: \(durationInSeconds) seconds")
+
+                let metadata = ["pull_duration_s": durationInSeconds]
+                print("📝 Metadata being sent: \(metadata)")
+                await MainActor.run {
+                    analyzeVideo(url: url, metadata: metadata)
+                }
+            } catch {
+                print("⚠️ Failed to get video duration: \(error)")
+                // Fallback without duration metadata
+                await MainActor.run {
+                    analyzeVideo(url: url, metadata: [:])
+                }
             }
         }
     }
-    
-    private func analyzeVideo(url: URL) {
+
+    private func analyzeVideo(url: URL, metadata: [String: Any] = [:]) {
+        print("🎬 Starting video analysis for: \(url)")
         isAnalyzing = true
-        
+
         Task {
             do {
-                let shot = try await APIService().analyzeVideo(videoURL: url)
-                
+                print("📡 Sending video to API with metadata: \(metadata)")
+                let shot = try await APIService().analyzeVideo(videoURL: url, metadata: metadata)
+                print("✅ API returned shot: \(shot)")
+
                 await MainActor.run {
+                    print("🎯 Setting analysis result and showing sheet")
                     isAnalyzing = false
                     analysisResult = shot
                     showingResult = true
+                    print("📱 showingResult is now: \(showingResult)")
                 }
             } catch {
+                print("❌ Analysis error: \(error)")
                 await MainActor.run {
                     isAnalyzing = false
                     appState.errorMessage = "Analysis failed: \(error.localizedDescription)"
@@ -214,53 +209,43 @@ struct RecordingView: View {
     }
 }
 
-// MARK: - ROI Guide Overlay
-struct ROIGuideView: View {
-    var body: some View {
-        ZStack {
-            // Semi-transparent overlay
-            Color.black.opacity(0.3)
-            
-            // ROI rectangle (matches your espresso_flow_features.py ROI)
-            GeometryReader { geometry in
-                let width = geometry.size.width
-                let height = geometry.size.height
-                
-                // ROI coordinates from your config (11%, 17%, 86%, 55%)
-                let x = width * 0.11
-                let y = height * 0.17
-                let roiWidth = width * (0.86 - 0.11)
-                let roiHeight = height * (0.55 - 0.17)
-                
-                Rectangle()
-                    .stroke(Color.green, lineWidth: 2)
-                    .frame(width: roiWidth, height: roiHeight)
-                    .position(x: x + roiWidth/2, y: y + roiHeight/2)
-                    .overlay(
-                        VStack {
-                            Text("Portafilter")
-                                .foregroundColor(.green)
-                                .font(.caption)
-                                .fontWeight(.medium)
-                            
-                            Spacer()
-                            
-                            Text("Flow Zone")
-                                .foregroundColor(.green)
-                                .font(.caption)
-                                .fontWeight(.medium)
-                            
-                            Spacer()
-                            
-                            Text("Cup Here")
-                                .foregroundColor(.green)
-                                .font(.caption)
-                                .fontWeight(.medium)
-                        }
-                        .frame(width: roiWidth, height: roiHeight)
-                        .position(x: x + roiWidth/2, y: y + roiHeight/2)
-                    )
+// MARK: - Native Camera Picker
+struct ImagePicker: UIViewControllerRepresentable {
+    let onVideoPicked: (URL) -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let picker = UIImagePickerController()
+        picker.sourceType = .camera
+        picker.mediaTypes = ["public.movie"]
+        picker.videoQuality = .typeMedium  // Changed from .typeHigh to reduce file size
+        // No duration limit - let users record as long as needed
+        picker.delegate = context.coordinator
+        return picker
+    }
+
+    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+
+    class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+        let parent: ImagePicker
+
+        init(_ parent: ImagePicker) {
+            self.parent = parent
+        }
+
+        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
+            if let videoURL = info[.mediaURL] as? URL {
+                parent.onVideoPicked(videoURL)
             }
+            parent.dismiss()
+        }
+
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+            parent.dismiss()
         }
     }
 }
