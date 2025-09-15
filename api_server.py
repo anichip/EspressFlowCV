@@ -18,12 +18,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Import your existing modules
-try:
-    from database.postgres_db import EspressoPostgreSQLDatabase as EspressoDatabase
-    logger.info("Using PostgreSQL database for production")
-except ImportError:
-    from database.espresso_db import EspressoDatabase
-    logger.info("Using SQLite database for development")
+# Database imports will be done conditionally below
 import cv2
 import joblib
 import pandas as pd
@@ -44,10 +39,14 @@ MAX_VIDEO_SIZE_MB = 100  # 50MB max video size
 # In development, fall back to SQLite
 try:
     if os.environ.get('DATABASE_URL'):
-        db = EspressoDatabase()  # PostgreSQL (no argument needed, uses env var)
+        # PostgreSQL - import the specific class and don't pass any arguments
+        from database.postgres_db import EspressoPostgreSQLDatabase
+        db = EspressoPostgreSQLDatabase()
         logger.info("✅ Connected to PostgreSQL database")
     else:
-        db = EspressoDatabase("espresso_shots.db")  # SQLite for local development
+        # SQLite - import the specific class and pass the database file
+        from database.espresso_db import EspressoDatabase
+        db = EspressoDatabase("espresso_shots.db")
         logger.info("✅ Connected to SQLite database")
 except Exception as e:
     logger.error(f"❌ Database initialization failed: {str(e)}")
