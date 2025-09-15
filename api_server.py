@@ -39,7 +39,18 @@ MAX_VIDEO_SIZE_MB = 100  # 50MB max video size
 # In development, fall back to SQLite
 db = None
 
-if os.environ.get('DATABASE_URL'):
+# Debug: Log environment to see what Railway has
+logger.info(f"🔍 Checking for DATABASE_URL environment variable...")
+database_url = os.environ.get('DATABASE_URL')
+logger.info(f"   DATABASE_URL exists: {database_url is not None}")
+if database_url:
+    # Hide password for security, just show if it's PostgreSQL
+    if database_url.startswith('postgresql://'):
+        logger.info("   DATABASE_URL is PostgreSQL connection string ✅")
+    else:
+        logger.info(f"   DATABASE_URL format: {database_url[:20]}...")
+
+if database_url:
     # PostgreSQL - only import when we know we need it
     try:
         from database.postgres_db import EspressoPostgreSQLDatabase
