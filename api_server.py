@@ -42,10 +42,10 @@ MODEL_METADATA = None
 def load_trained_model():
     """Load trained ML model and metadata"""
     global MODEL, MODEL_METADATA
-    
-    model_path = "espresso_model.joblib" 
+
+    model_path = "espresso_model.joblib"
     metadata_path = "model_metadata.joblib"
-    
+
     try:
         if os.path.exists(model_path) and os.path.exists(metadata_path):
             MODEL = joblib.load(model_path)
@@ -56,10 +56,14 @@ def load_trained_model():
             logger.info(f"   Features: {MODEL_METADATA['feature_count']}")
             return True
         else:
-            logger.warning("⚠️  No trained model found. Run train_model.py first")
+            logger.warning("⚠️  No trained model found. Server will use rule-based classification.")
+            logger.warning(f"   Looking for: {model_path} and {metadata_path}")
+            logger.warning(f"   Current directory: {os.getcwd()}")
+            logger.warning(f"   Files in directory: {os.listdir('.')}")
             return False
     except Exception as e:
         logger.error(f"❌ Failed to load trained model: {str(e)}")
+        logger.error(f"   This is not fatal - server will continue with rule-based classification")
         return False
 
 def classify_with_trained_model(features_dict: Dict) -> tuple:
@@ -625,21 +629,33 @@ def internal_error(error):
     return jsonify({'error': 'Internal server error'}), 500
 
 if __name__ == '__main__':
-    # Ensure upload folder exists
-    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-    
-    # Load trained model on startup
-    model_loaded = load_trained_model()
-    
-    # Development server settings
-    print(f"🚀 EspressFlowCV API Server starting...")
-    print(f"📁 Upload folder: {UPLOAD_FOLDER}")
-    print(f"💾 Database: espresso_shots.db")
-    print(f"🤖 ML Model: {'✅ Loaded' if model_loaded else '❌ Not found (run train_model.py)'}")
-    print(f"🌐 Health check: http://localhost:5000/api/health")
-    
-    # Get port from environment (Railway sets this automatically)
-    port = int(os.environ.get('PORT', 5000))
+    try:
+        # Ensure upload folder exists
+        os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+        logger.info(f"📁 Upload folder created: {UPLOAD_FOLDER}")
 
-    # For production, use gunicorn or similar WSGI server
-    app.run(host='0.0.0.0', port=port, debug=False)
+        # Initialize database
+        logger.info("💾 Initializing database...")
+        db_stats = db.get_database_stats()
+        logger.info(f"   Database ready: {db_stats['database_path']}")
+
+        # Load trained model on startup (non-fatal if it fails)
+        logger.info("🤖 Loading ML model...")
+        model_loaded = load_trained_model()
+
+        # Server startup
+        logger.info("🚀 EspressFlowCV API Server starting...")
+        logger.info(f"📁 Upload folder: {UPLOAD_FOLDER}")
+        logger.info(f"💾 Database: espresso_shots.db")
+        logger.info(f"🤖 ML Model: {'✅ Loaded' if model_loaded else '⚠️  Using rule-based fallback'}")
+
+        # Get port from environment (Railway sets this automatically)
+        port = int(os.environ.get('PORT', 5000))
+        logger.info(f"🌐 Starting server on port {port}")
+
+        # For production, use gunicorn or similar WSGI server
+        app.run(host='0.0.0.0', port=port, debug=False)
+
+    except Exception as e:
+        logger.error(f"❌ Failed to start server: {str(e)}")
+        raise
