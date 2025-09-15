@@ -250,6 +250,37 @@ def analyze_espresso_shot():
             'timestamp': datetime.now().isoformat()
         }), 500
 
+def clean_shot_for_json(shot):
+    """Clean a shot dictionary to ensure JSON serialization works"""
+    cleaned_shot = shot.copy()
+
+    # Clean features if they exist
+    if 'features' in cleaned_shot and cleaned_shot['features']:
+        try:
+            import json
+            features = json.loads(cleaned_shot['features']) if isinstance(cleaned_shot['features'], str) else cleaned_shot['features']
+            clean_features = {}
+            for key, value in features.items():
+                if isinstance(value, (int, float)):
+                    if np.isnan(value) or np.isinf(value):
+                        clean_features[key] = None
+                    else:
+                        clean_features[key] = float(value)
+                else:
+                    clean_features[key] = value
+            cleaned_shot['features'] = clean_features
+        except:
+            cleaned_shot['features'] = {}
+
+    # Clean other numeric fields
+    for field in ['confidence', 'video_duration_s']:
+        if field in cleaned_shot and cleaned_shot[field] is not None:
+            if isinstance(cleaned_shot[field], (int, float)):
+                if np.isnan(cleaned_shot[field]) or np.isinf(cleaned_shot[field]):
+                    cleaned_shot[field] = None
+
+    return cleaned_shot
+
 @app.route('/api/shots', methods=['GET'])
 def get_shots():
     """Get all shots with optional filtering"""
@@ -257,18 +288,21 @@ def get_shots():
         # Query parameters
         limit = request.args.get('limit', type=int)
         result_filter = request.args.get('result')  # 'good' or 'under'
-        
+
         if result_filter:
             shots = db.get_shots_by_result(result_filter)
         else:
             shots = db.get_all_shots(limit=limit)
-        
+
+        # Clean shots for JSON serialization
+        clean_shots = [clean_shot_for_json(shot) for shot in shots]
+
         return jsonify({
-            'shots': shots,
-            'count': len(shots),
+            'shots': clean_shots,
+            'count': len(clean_shots),
             'timestamp': datetime.now().isoformat()
         }), 200
-        
+
     except Exception as e:
         logger.error(f"Failed to get shots: {str(e)}")
         return jsonify({'error': str(e)}), 500

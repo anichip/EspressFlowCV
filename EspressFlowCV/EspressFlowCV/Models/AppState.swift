@@ -130,8 +130,10 @@ class AppState: ObservableObject {
         
         do {
             let shots = try await apiService.getShots()
+            print("📊 Loaded \(shots.count) shots from API")
             self.shots = shots
         } catch {
+            print("❌ Failed to load shots: \(error)")
             self.errorMessage = "Failed to load shots: \(error.localizedDescription)"
         }
         

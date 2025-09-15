@@ -57,7 +57,12 @@ struct HistoryView: View {
             }
             
             if appState.shots.isEmpty {
-                EmptyStateView()
+                if appState.isLoading {
+                    ProgressView("Loading shots...")
+                        .padding()
+                } else {
+                    EmptyStateView()
+                }
             } else {
                 LazyVStack(spacing: 12) {
                     ForEach(appState.shots) { shot in
