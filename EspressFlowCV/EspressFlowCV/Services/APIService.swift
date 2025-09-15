@@ -6,6 +6,7 @@ class APIService {
 
     // Candidate URLs to try in order of preference
     private let candidateURLs = [
+        "https://web-production-4604.up.railway.app",  // Production server on Railway
         "http://localhost:5000",        // Local development
         "http://127.0.0.1:5000",       // Local fallback
         "http://192.168.86.53:5000",   // Your home WiFi
