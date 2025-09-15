@@ -37,20 +37,27 @@ MAX_VIDEO_SIZE_MB = 100  # 50MB max video size
 # Initialize database
 # In production (Railway), use PostgreSQL with DATABASE_URL
 # In development, fall back to SQLite
-try:
-    if os.environ.get('DATABASE_URL'):
-        # PostgreSQL - import the specific class and don't pass any arguments
+db = None
+
+if os.environ.get('DATABASE_URL'):
+    # PostgreSQL - only import when we know we need it
+    try:
         from database.postgres_db import EspressoPostgreSQLDatabase
         db = EspressoPostgreSQLDatabase()
         logger.info("✅ Connected to PostgreSQL database")
-    else:
-        # SQLite - import the specific class and pass the database file
+    except Exception as e:
+        logger.error(f"❌ PostgreSQL initialization failed: {str(e)}")
+        raise
+else:
+    # SQLite - only import when we're in development
+    try:
         from database.espresso_db import EspressoDatabase
         db = EspressoDatabase("espresso_shots.db")
         logger.info("✅ Connected to SQLite database")
-except Exception as e:
-    logger.error(f"❌ Database initialization failed: {str(e)}")
-    raise
+    except Exception as e:
+        logger.error(f"❌ SQLite initialization failed: {str(e)}")
+        logger.error("This might be because SQLite is not available in this environment")
+        raise
 
 # Global model variables (loaded on startup)
 MODEL = None
