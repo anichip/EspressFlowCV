@@ -218,8 +218,8 @@ struct ImagePicker: UIViewControllerRepresentable {
         let picker = UIImagePickerController()
         picker.sourceType = .camera
         picker.mediaTypes = ["public.movie"]
-        picker.videoQuality = .typeMedium  // Changed from .typeHigh to reduce file size
-        // No duration limit - let users record as long as needed
+        picker.videoQuality = .typeHigh  // Use high quality for better stream detection
+        picker.videoMaximumDuration = 26.0  // Limit to 26 seconds to prevent Railway timeout
         picker.delegate = context.coordinator
         return picker
     }
