@@ -120,8 +120,28 @@ class AppState: ObservableObject {
     }
     
     func loadData() {
+        // Load shots from local storage first
+        loadShotsFromLocalStorage()
+
         Task {
             await performInitialSetup()
+        }
+    }
+
+    private func loadShotsFromLocalStorage() {
+        if let data = UserDefaults.standard.data(forKey: "savedShots"),
+           let decodedShots = try? JSONDecoder().decode([EspressoShot].self, from: data) {
+            self.shots = decodedShots
+            print("📱 Loaded \(decodedShots.count) shots from local storage")
+        } else {
+            print("📱 No shots found in local storage")
+        }
+    }
+
+    private func saveShotsToLocalStorage() {
+        if let encoded = try? JSONEncoder().encode(shots) {
+            UserDefaults.standard.set(encoded, forKey: "savedShots")
+            print("💾 Saved \(shots.count) shots to local storage")
         }
     }
 
@@ -133,7 +153,7 @@ class AppState: ObservableObject {
 
         if serverFound {
             print("✅ Server discovered, loading data...")
-            await refreshShots()
+            // Skip server shots refresh - we're using local storage now
             await refreshSummary()
         } else {
             print("❌ No server found during initial setup")
@@ -191,17 +211,27 @@ class AppState: ObservableObject {
     
     @MainActor
     func refreshSummary() async {
-        do {
-            let summary = try await apiService.getSummary()
-            self.summary = summary
-        } catch {
-            print("Failed to load summary: \(error)")
-        }
+        // Calculate summary from local shots data instead of server
+        let totalShots = shots.count
+        let goodShots = shots.filter { $0.isGoodShot }.count
+        let underShots = totalShots - goodShots
+
+        let goodPercentage = totalShots > 0 ? (Double(goodShots) / Double(totalShots)) * 100 : 0
+        let underPercentage = totalShots > 0 ? (Double(underShots) / Double(totalShots)) * 100 : 0
+
+        self.summary = ShotsSummary(
+            totalShots: totalShots,
+            goodShots: goodShots,
+            underShots: underShots,
+            goodPercentage: goodPercentage,
+            underPercentage: underPercentage
+        )
     }
     
     @MainActor
     func addNewShot(_ shot: EspressoShot) {
         shots.insert(shot, at: 0) // Add to beginning
+        saveShotsToLocalStorage() // Save to device storage
         // Refresh summary to update counts
         Task {
             await refreshSummary()
@@ -210,12 +240,9 @@ class AppState: ObservableObject {
     
     @MainActor
     func deleteShot(_ shot: EspressoShot) async {
-        do {
-            try await apiService.deleteShot(shotId: shot.id)
-            shots.removeAll { $0.id == shot.id }
-            await refreshSummary()
-        } catch {
-            errorMessage = "Failed to delete shot: \(error.localizedDescription)"
-        }
+        // Remove from local storage only (no server call needed)
+        shots.removeAll { $0.id == shot.id }
+        saveShotsToLocalStorage() // Save updated list to device
+        await refreshSummary()
     }
 }

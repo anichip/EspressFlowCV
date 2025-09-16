@@ -176,8 +176,8 @@ class APIService {
             // Add video file
             let videoData = try Data(contentsOf: videoURL)
             guard let boundaryData = "--\(boundary)\r\n".data(using: .utf8),
-                  let headerData = "Content-Disposition: form-data; name=\"video\"; filename=\"espresso_shot.mp4\"\r\n".data(using: .utf8),
-                  let typeData = "Content-Type: video/mp4\r\n\r\n".data(using: .utf8),
+                  let headerData = "Content-Disposition: form-data; name=\"video\"; filename=\"espresso_shot.mov\"\r\n".data(using: .utf8),
+                  let typeData = "Content-Type: video/quicktime\r\n\r\n".data(using: .utf8),
                   let endData = "\r\n".data(using: .utf8) else {
                 throw APIError.encodingError
             }
