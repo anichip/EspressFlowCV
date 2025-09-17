@@ -9,3 +9,6 @@ Progress:
 - Cloud server running 
 - Frontend connects 
 - Sending to Apple for review
+
+#Privacy Policy:
+https://github.com/anichip/EspressFlowCV/blob/main/espressflowcv_privacy_policy.md 
