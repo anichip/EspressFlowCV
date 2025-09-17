@@ -63,7 +63,7 @@ struct AboutView: View {
                             TechRow(label: "Computer Vision", value: "OpenCV")
                             TechRow(label: "Machine Learning", value: "Scikit-Learn")
                             TechRow(label: "Backend", value: "Flask API")
-                            TechRow(label: "Database", value: "SQLite")
+                            TechRow(label: "Database", value: "PostgreSQL")
                             TechRow(label: "Frontend", value: "Swift")
                         }
                     }

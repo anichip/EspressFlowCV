@@ -1,30 +1,48 @@
+# Video Files & Data
 *.mov
 *.mp4
 frames_*/
 data_*/
+
+# Training Data & Features (Proprietary)
 features.csv
 features_v2.csv
 pull_times.csv
+
+# Trained ML Models (Proprietary - Investment Protection)
+*.joblib
+espresso_model.joblib
+model_metadata.joblib
+
+# Python
 __pycache__/
 *.pyc
-.vscode/
-test_cv.py
-Sample_CV.webp
-openCV_Tutorial.py
 coffeecv.yml
+
+# Development Environment
+.vscode/
 CLAUDE.md
 
-# Ignore all debug images except specific ones
-debug_*.jpg
-!debug_early_frame_070_original.jpg
-!debug_middle_frame_210_roi.jpg
-
+# Database Files
 demo_espresso.db
+*.db
 
-#All Mds
+# Test Files
+test_cv.py
+test_api.py
+openCV_Tutorial.py
+
+# Documentation (Work in Progress)
 API_SERVER_STATUS.md
 README_APP.md
 
-test_api.py
+# Sample/Demo Files
+Sample_CV.webp
 
+# iOS Development (Separate Repository)
 /iOS_App/
+
+# Debug Images (Keep only specific examples)
+debug_*.jpg
+!debug_early_frame_070_original.jpg
+!debug_middle_frame_210_roi.jpg
