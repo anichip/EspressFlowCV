@@ -106,7 +106,7 @@ We may update this privacy policy from time to time. Since our architecture stor
 If you have any questions about this privacy policy or our data practices, please contact us at:
 
 **Email**: [ani.chiplunkar@gmail.com]
-**GitHub**: [Your GitHub repository for transparency]
+**GitHub**: https://github.com/anichip/EspressFlowCV/blob/main/espressflowcv_privacy_policy.md
 
 ## Third-Party Services
 
