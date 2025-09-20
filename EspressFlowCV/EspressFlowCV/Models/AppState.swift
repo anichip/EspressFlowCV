@@ -163,43 +163,11 @@ class AppState: ObservableObject {
     
     @MainActor
     func refreshShots() async {
-        isLoading = true
-        errorMessage = nil
-        retryCount = 0
-
-        await attemptShotsRefresh()
-    }
-
-    @MainActor
-    private func attemptShotsRefresh() async {
-        do {
-            let shots = try await apiService.getShots()
-            print("📊 Loaded \(shots.count) shots from API")
-            self.shots = shots
-            self.errorMessage = nil
-            self.retryCount = 0
-            self.isRetrying = false
-        } catch {
-            print("❌ Failed to load shots (attempt \(retryCount + 1)): \(error)")
-
-            if retryCount < maxRetries {
-                retryCount += 1
-                isRetrying = true
-                errorMessage = "Retrying connection... (attempt \(retryCount)/\(maxRetries))"
-
-                // Exponential backoff: 1s, 2s, 4s
-                let delay = TimeInterval(pow(2.0, Double(retryCount - 1)))
-                print("🔄 Retrying in \(delay) seconds...")
-
-                try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
-                await attemptShotsRefresh()
-            } else {
-                isRetrying = false
-                errorMessage = error.localizedDescription
-            }
-        }
-
+        // Refresh from local storage only - no server calls
+        loadShotsFromLocalStorage()
+        await refreshSummary()
         isLoading = false
+        errorMessage = nil
     }
 
     @MainActor
